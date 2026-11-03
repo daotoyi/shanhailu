@@ -14,6 +14,8 @@ export class FollowCamera {
   yaw = 0;
   pitch = 0.32;
   dist = BASE_DIST;
+  /** 鼠标灵敏度(设置页可调) */
+  sensitivity = 0.0032;
   private readonly target = new THREE.Vector3();
   private shake = 0;
 
@@ -43,7 +45,7 @@ export class FollowCamera {
   update(dt: number, playerPos: THREE.Vector3): void {
     // 视角输入(鼠标 + 触屏统一)
     const look = this.input.consumeLook();
-    const sens = 0.0032;
+    const sens = this.sensitivity;
     this.yaw -= look.dx * sens;
     this.pitch += look.dy * sens;
     this.pitch = Math.max(MIN_PITCH, Math.min(MAX_PITCH, this.pitch));

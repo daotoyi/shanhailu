@@ -24,6 +24,7 @@ export interface AppEventMap {
   'beast:caught': { beastId: string; name: string };
   'beast:fed': { beastId: string; stage: number };
   'beast:ride': { riding: boolean };
+  'achievement:unlocked': { id: string };
 }
 
 type Handler<K extends keyof AppEventMap> = (payload: AppEventMap[K]) => void;

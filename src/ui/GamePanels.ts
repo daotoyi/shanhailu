@@ -2,14 +2,18 @@ import { ITEMS, QUALITY_COLOR, QUALITY_LABEL, EQUIP_SLOT_LABEL, type EquipSlot }
 import { RECIPES } from '../data/recipes.js';
 import { CITY_SHOP } from '../data/progression.js';
 import { BEASTS } from '../data/bestiary.js';
+import { ACHIEVEMENTS } from '../gameplay/Achievements.js';
+import { QUALITY_ORDER, QUALITY_LABEL as QLABEL } from '../data/quality-presets.js';
+import type { QualityLevel } from '../data/quality-presets.js';
 import type { Inventory } from '../gameplay/Inventory.js';
 import type { Equipment } from '../gameplay/Equipment.js';
 import type { Progression } from '../gameplay/Progression.js';
 import type { Alchemy } from '../gameplay/Alchemy.js';
 import type { BeastSystem } from '../gameplay/BeastSystem.js';
+import type { Achievements } from '../gameplay/Achievements.js';
 import type { EventBus } from '../core/events.js';
 
-export type PanelTab = 'bag' | 'equip' | 'alchemy' | 'shop' | 'bestiary';
+export type PanelTab = 'bag' | 'equip' | 'alchemy' | 'shop' | 'bestiary' | 'achieve' | 'settings';
 
 /**
  * 游戏主面板(国风卷轴,四页签):背包/装备/炼药/商店(PROMPT §3.8/3.10/3.11)。
@@ -31,11 +35,18 @@ export class GamePanels {
     private readonly progression: Progression,
     private readonly alchemy: Alchemy,
     private readonly beasts: BeastSystem,
+    private readonly achievements: Achievements,
     bus: EventBus,
     stage: { append(...nodes: HTMLElement[]): void },
     private readonly hooks: {
       onUseItem: (bagIndex: number) => void;
       onEquipChanged: () => void;
+      onQualityChange: (level: QualityLevel) => void;
+      onSensitivityChange: (v: number) => void;
+      onVolumeChange: (track: 'master' | 'bgm' | 'sfx', v: number) => void;
+      getQuality: () => QualityLevel;
+      getSensitivity: () => number;
+      getVolumes: () => { master: number; bgm: number; sfx: number };
     },
   ) {
     this.root = document.createElement('div');
@@ -53,7 +64,7 @@ export class GamePanels {
 
     this.tabsBar = document.createElement('div');
     this.tabsBar.style.cssText = 'display:flex;gap:6px;padding:12px 18px 0;';
-    for (const [key, label] of [['bag', '背包'], ['equip', '装备'], ['alchemy', '炼药'], ['shop', '商店'], ['bestiary', '图鉴']] as const) {
+    for (const [key, label] of [['bag', '背包'], ['equip', '装备'], ['alchemy', '炼药'], ['shop', '商店'], ['bestiary', '图鉴'], ['achieve', '成就'], ['settings', '设置']] as const) {
       const b = document.createElement('button');
       b.className = 'dsh-btn';
       b.style.cssText = 'font-size:13px;padding:6px 18px;letter-spacing:3px;';
@@ -136,6 +147,8 @@ export class GamePanels {
     else if (this.tab === 'equip') this.renderEquip();
     else if (this.tab === 'alchemy') this.renderAlchemy();
     else if (this.tab === 'bestiary') this.renderBestiary();
+    else if (this.tab === 'achieve') this.renderAchievements();
+    else if (this.tab === 'settings') this.renderSettings();
     else this.renderShop();
   }
 
@@ -340,6 +353,105 @@ export class GamePanels {
       list.append(row);
     }
     this.body.append(head, list);
+  }
+
+  /** 成就页(PROMPT §3.12) */
+  private renderAchievements(): void {
+    const head = document.createElement('div');
+    head.className = 'dsh-label';
+    head.style.cssText = 'font-size:13px;margin-bottom:10px;';
+    const n = ACHIEVEMENTS.filter((a) => this.achievements.isUnlocked(a.id)).length;
+    head.innerHTML = `功业簿 · 成就 <span class="dsh-label gold">${n} / ${ACHIEVEMENTS.length}</span>`;
+    const list = document.createElement('div');
+    list.style.cssText = 'display:flex;flex-direction:column;gap:6px;';
+    for (const a of ACHIEVEMENTS) {
+      const got = this.achievements.isUnlocked(a.id);
+      const row = document.createElement('div');
+      row.style.cssText = [
+        'display:flex;align-items:center;gap:12px;padding:8px 12px;',
+        'border:1px solid', got ? 'rgba(255,212,94,0.55)' : 'rgba(201,162,92,0.18)',
+        'border-radius:3px;background:rgba(23,19,14,0.45);',
+      ].join(';');
+      const seal = document.createElement('div');
+      seal.style.cssText = [
+        'width:30px;height:30px;flex:0 0 auto;border-radius:3px;display:flex;align-items:center;justify-content:center;',
+        'font-size:15px;', got ? 'background:#b03a2e;color:#f0d9c8;' : 'background:rgba(23,19,14,0.8);color:rgba(232,226,211,0.3);',
+      ].join(';');
+      seal.textContent = got ? '成' : '未';
+      const mid = document.createElement('div');
+      mid.style.cssText = `flex:1;font-size:13px;color:${got ? '#e8e2d3' : 'rgba(232,226,211,0.4)'};`;
+      const name = a.secret && !got ? '???' : a.name;
+      const desc = a.secret && !got ? '隐匿的功业,尚待揭晓。' : a.desc;
+      mid.innerHTML = `<div>${name}</div><div style="font-size:11px;opacity:0.65;">${desc}</div>`;
+      row.append(seal, mid);
+      list.append(row);
+    }
+    this.body.append(head, list);
+  }
+
+  /** 设置页(PROMPT §3.15):音量三轨/画质三档/灵敏度 */
+  private renderSettings(): void {
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'display:flex;flex-direction:column;gap:14px;';
+    // 音量三轨
+    const vols = this.hooks.getVolumes();
+    for (const [track, label] of [['master', '主音量'], ['bgm', '乐声'], ['sfx', '音效']] as const) {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:12px;';
+      const lab = document.createElement('div');
+      lab.className = 'dsh-label';
+      lab.style.cssText = 'width:70px;font-size:13px;';
+      lab.textContent = label;
+      const slider = document.createElement('input');
+      slider.type = 'range';
+      slider.min = '0';
+      slider.max = '100';
+      slider.value = String(Math.round(vols[track] * 100));
+      slider.style.cssText = 'flex:1;accent-color:#c9a25c;';
+      slider.addEventListener('input', () => {
+        this.hooks.onVolumeChange(track, Number(slider.value) / 100);
+      });
+      row.append(lab, slider);
+      wrap.append(row);
+    }
+    // 画质
+    const qRow = document.createElement('div');
+    qRow.style.cssText = 'display:flex;align-items:center;gap:12px;';
+    const qLab = document.createElement('div');
+    qLab.className = 'dsh-label';
+    qLab.style.cssText = 'width:70px;font-size:13px;';
+    qLab.textContent = '画质';
+    const qBtns = document.createElement('div');
+    qBtns.style.cssText = 'display:flex;gap:6px;';
+    const cur = this.hooks.getQuality();
+    for (const q of QUALITY_ORDER) {
+      const b = this.actionBtn(QLABEL[q], () => {
+        this.hooks.onQualityChange(q);
+        this.dirty = true;
+      }, q === cur);
+      qBtns.append(b);
+    }
+    qRow.append(qLab, qBtns);
+    wrap.append(qRow);
+    // 灵敏度
+    const sRow = document.createElement('div');
+    sRow.style.cssText = 'display:flex;align-items:center;gap:12px;';
+    const sLab = document.createElement('div');
+    sLab.className = 'dsh-label';
+    sLab.style.cssText = 'width:70px;font-size:13px;';
+    sLab.textContent = '镜头';
+    const sSlider = document.createElement('input');
+    sSlider.type = 'range';
+    sSlider.min = '20';
+    sSlider.max = '200';
+    sSlider.value = String(Math.round(this.hooks.getSensitivity() * 100));
+    sSlider.style.cssText = 'flex:1;accent-color:#c9a25c;';
+    sSlider.addEventListener('input', () => {
+      this.hooks.onSensitivityChange(Number(sSlider.value) / 100);
+    });
+    sRow.append(sLab, sSlider);
+    wrap.append(sRow);
+    this.body.append(wrap);
   }
 
   private renderShop(): void {

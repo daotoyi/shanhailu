@@ -23,6 +23,8 @@ import { Equipment } from './gameplay/Equipment.js';
 import { Progression } from './gameplay/Progression.js';
 import { Alchemy } from './gameplay/Alchemy.js';
 import { BeastSystem } from './gameplay/BeastSystem.js';
+import { Achievements } from './gameplay/Achievements.js';
+import { AudioDirector } from './audio/AudioDirector.js';
 import { BEASTS, CATCH_ITEM } from './data/bestiary.js';
 import { ITEMS, type ItemDef } from './data/items.js';
 import { MONSTERS } from './data/monsters.js';
@@ -146,6 +148,11 @@ async function boot(): Promise<void> {
   const hud = new PlayerHUD(ui);
   hud.show();
 
+  /* ---- 音频与成就(M8) ---- */
+  const audio = new AudioDirector(bus);
+  const achievements = new Achievements(bus);
+  achievements.setBanner((text) => tracker.showBanner(text, 2600));
+
   /* ---- 神兽系统(M6) ---- */
   const beasts = new BeastSystem(world.scene, bus);
   bus.on('quest:kill', ({ monsterId }) => {
@@ -240,9 +247,10 @@ async function boot(): Promise<void> {
       const herbs = ['herb_qingjingzhi', 'herb_xuejiancao'];
       inventory.add(herbs[Math.floor(Math.random() * herbs.length)]!, amount);
     }
+    audio.sfx('pickup', 0.5);
     panels.markDirty();
   };
-  const panels = new GamePanels(inventory, equipment, progression, alchemy, beasts, bus, ui, {
+  const panels = new GamePanels(inventory, equipment, progression, alchemy, beasts, achievements, bus, ui, {
     onUseItem: (bagIndex) => {
       const def: ItemDef | null = inventory.consume(bagIndex);
       if (!def?.effects) return;
@@ -261,6 +269,18 @@ async function boot(): Promise<void> {
       syncStats();
       panels.markDirty();
     },
+    onQualityChange: (level) => {
+      quality.set(level);
+    },
+    onSensitivityChange: (v) => {
+      followCam.sensitivity = 0.0032 * v;
+    },
+    onVolumeChange: (track, v) => {
+      audio.setVolume(track, v);
+    },
+    getQuality: () => quality.current,
+    getSensitivity: () => followCam.sensitivity / 0.0032,
+    getVolumes: () => audio.volumes,
   });
   panels.onClosed(() => {
     director.freezePlayer = false;
@@ -320,6 +340,7 @@ async function boot(): Promise<void> {
 
   const beastSystemDeserialize = (data: NonNullable<ReturnType<SaveSystem['load']>>): void => {
     beasts.deserialize(data.bestiary ?? {});
+    achievements.deserialize((data as { achievements?: { unlocked?: string[]; kills?: number } }).achievements ?? {});
   };
 
   const saveBlobExtra = () => ({
@@ -327,6 +348,7 @@ async function boot(): Promise<void> {
     equip: equipment.serialize(),
     prog: progression.serialize(),
     bestiary: beasts.serialize(),
+    achievements: achievements.serialize(),
   });
 
   const afterMapSwitch = (pos: THREE.Vector3): void => {
@@ -336,6 +358,9 @@ async function boot(): Promise<void> {
     directorRef?.refreshEntities();
     directorRef?.bindInteractables();
     spawnWildBeasts();
+    // BGM 换调(每图一调,五声音阶循环)
+    const mapIds = Object.keys(MAPS);
+    audio.setKey(mapIds.indexOf(world.maps.def.id));
   };
 
   const teleportTo = (mapId: string, spawnId?: string): void => {
@@ -458,6 +483,8 @@ async function boot(): Promise<void> {
     engine.renderer.info.reset();
     state.playtimeSec += dt;
     progression.update(elapsed);
+    achievements.checkRich(inventory.coins);
+    achievements.checkAlchemy(alchemy.level);
     const interactPressed = input.consumePressed('interact');
     const dialogFrozen = dialogs.isOpen || cin.isPlaying || director.freezePlayer || panels.isOpen || saveMenu.isOpen;
 
@@ -525,6 +552,7 @@ async function boot(): Promise<void> {
     await p.audio.unlock();
     loading.close();
     engine.start();
+    await audio.init(); // BGM/SFX 就绪(失败静音降级)
     // 有自动档 → 自动续玩;否则新档开场运镜
     const auto = save.load(0);
     if (auto) {
