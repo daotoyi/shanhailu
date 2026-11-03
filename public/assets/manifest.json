@@ -1,0 +1,14 @@
+{
+  "$schema": "资产登记清单(PROMPT §4.4):所有运行时资产必须在此注册,注明来源与许可证;未登记资产禁止入库",
+  "assets": [
+    {
+      "id": "font-dashan-subset",
+      "path": "assets/fonts/dashan-subset.woff2",
+      "type": "font",
+      "generated": true,
+      "generator": "tools/font-subset.mjs",
+      "license": "OFL-1.1(霞鹜文楷 LXGW WenKai 子集)",
+      "notes": "构建期子集产物,不入 git;运行时缺失时自动降级 CDN/系统字体"
+    }
+  ]
+}

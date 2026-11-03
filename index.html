@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>大荒山海录</title>
+  <!--
+    加载页关键样式内联于此前(保证 JS 未就绪时首帧即有国风观感);
+    完整 UI 主题见 src/ui/theme.css(随构建打包)。
+    注意:#boot-splash 位于 #ui-root 内,受 1280×720 虚拟分辨率缩放。
+  -->
+  <style>
+    html, body {
+      margin: 0; padding: 0; width: 100%; height: 100%;
+      background: #17130e; overflow: hidden;
+      font-family: 'DashanWenKai', 'LXGW WenKai', 'Kaiti SC', 'STKaiti', 'KaiTi', serif;
+    }
+    #game-canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+    #ui-root {
+      position: fixed; left: 50%; top: 50%; width: 1280px; height: 720px;
+      transform-origin: center center; transform: translate(-50%, -50%) scale(1);
+    }
+    #boot-splash {
+      position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+      background:
+        radial-gradient(ellipse 120% 90% at 50% 110%, #2b2018 0%, rgba(43,32,24,0) 55%),
+        radial-gradient(ellipse 100% 70% at 50% -10%, #1d2a26 0%, rgba(29,42,38,0) 60%),
+        #17130e;
+      z-index: 10;
+    }
+    .splash-frame {
+      display: flex; flex-direction: column; align-items: center; gap: 22px;
+      padding: 56px 88px;
+      border: 1px solid rgba(201, 162, 92, 0.55);
+      box-shadow: inset 0 0 0 4px #17130e, inset 0 0 0 5px rgba(201,162,92,0.28), 0 0 60px rgba(0,0,0,0.55);
+      background: linear-gradient(180deg, rgba(23,19,14,0.92), rgba(43,32,24,0.55));
+    }
+    .splash-title {
+      font-size: 64px; letter-spacing: 14px; text-indent: 14px; color: #e8e2d3;
+      text-shadow: 0 0 24px rgba(201,162,92,0.35), 0 2px 0 rgba(0,0,0,0.6);
+    }
+    .splash-sub { font-size: 15px; letter-spacing: 10px; text-indent: 10px; color: #3f6f5f; }
+    .splash-divider {
+      width: 320px; height: 10px;
+      background:
+        radial-gradient(circle 4px at 50% 50%, #b03a2e 0 3px, transparent 4px),
+        linear-gradient(90deg, transparent 0%, rgba(201,162,92,0.7) 18%, rgba(201,162,92,0.7) 82%, transparent 100%);
+      background-size: 100% 10px, 100% 1px;
+      background-position: center, center;
+      background-repeat: no-repeat;
+    }
+    .splash-bar {
+      width: 320px; height: 8px; padding: 1px;
+      border: 1px solid rgba(201,162,92,0.45); background: rgba(23,19,14,0.8);
+    }
+    .splash-bar-fill {
+      width: 0%; height: 100%;
+      background: linear-gradient(90deg, #3f6f5f, #c9a25c);
+      box-shadow: 0 0 10px rgba(201,162,92,0.5);
+      transition: width 0.25s ease-out;
+    }
+    .splash-status { font-size: 13px; letter-spacing: 4px; color: rgba(232,226,211,0.55); min-height: 18px; }
+    .splash-enter {
+      display: none; cursor: pointer; padding: 10px 46px;
+      font-size: 20px; letter-spacing: 12px; text-indent: 12px; color: #e8e2d3;
+      background: linear-gradient(180deg, rgba(63,111,95,0.35), rgba(43,32,24,0.9));
+      border: 1px solid #c9a25c; border-radius: 2px;
+      box-shadow: 0 0 18px rgba(201,162,92,0.25), inset 0 0 12px rgba(201,162,92,0.12);
+      transition: all 0.25s ease;
+    }
+    .splash-enter:hover { color: #fff; box-shadow: 0 0 26px rgba(201,162,92,0.5), inset 0 0 16px rgba(201,162,92,0.22); }
+    .splash-error { font-size: 13px; color: #b03a2e; letter-spacing: 2px; max-width: 420px; text-align: center; }
+  </style>
+</head>
+<body>
+  <canvas id="game-canvas"></canvas>
+  <div id="ui-root">
+    <div id="boot-splash">
+      <div class="splash-frame">
+        <div class="splash-title">大荒山海录</div>
+        <div class="splash-sub">山经 · 海典 · 蛮荒志</div>
+        <div class="splash-divider"></div>
+        <div class="splash-bar"><div class="splash-bar-fill" id="boot-bar-fill"></div></div>
+        <div class="splash-status" id="boot-status">正在唤醒大荒……</div>
+        <div class="splash-error" id="boot-error" style="display:none"></div>
+        <button class="splash-enter" id="boot-enter">入 荒</button>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
