@@ -147,4 +147,132 @@ export const DIALOGS: Record<string, DialogTree> = {
       },
     },
   },
+
+  /* ================= M7 章节对话(自拟改编) ================= */
+
+  /* ---- 第二章:蚩尤(九黎) ---- */
+  dlg_npc_chiyou: {
+    root: 'start',
+    nodes: {
+      start: {
+        speaker: '蚩尤',
+        portrait: 'chiyou',
+        text: '背着一卷破书就敢闯九黎?……哦?神农尺。有意思,老神仙的东西怎么在你手上?',
+        next: 'p2',
+      },
+      p2: {
+        speaker: '赤松',
+        portrait: 'player',
+        text: '师父托付的。水族下毒害神农共主,我要查到底。',
+        next: 'p3',
+      },
+      p3: {
+        speaker: '蚩尤',
+        portrait: 'chiyou',
+        text: '好胆色!九黎的规矩:想结交,先打架;想结义,先共生死。禁地里那几头傀儡,替我拆了!',
+        actions: ['quest:talk:dlg_npc_chiyou'],
+        end: true,
+      },
+      done: {
+        speaker: '蚩尤',
+        portrait: 'chiyou',
+        text: '痛快!从今往后,你就是我蚩尤的兄弟。水族的事,九黎陪你扛!',
+        end: true,
+      },
+    },
+  },
+  dlg_npc_chiyou_done: {
+    root: 'start',
+    nodes: {
+      start: { speaker: '蚩尤', portrait: 'chiyou', text: '兄弟,禁地清干净了?汤谷那边天上有十个太阳,烤得九黎的牛都瘦了——去会会那金乌!', end: true },
+    },
+  },
+
+  /* ---- 第四章:雨师妾(蜃楼城) ---- */
+  dlg_npc_yushiqie: {
+    root: 'start',
+    nodes: {
+      start: {
+        speaker: '雨师妾',
+        portrait: 'yushiqie',
+        text: '哎呀,一个活人走进蜃楼城?你猜你现在踩着的是街道,还是我的水镜?',
+        next: 'p2',
+      },
+      p2: {
+        speaker: '赤松',
+        portrait: 'player',
+        text: '水族的人。你要拦我?',
+        next: 'p3',
+      },
+      p3: {
+        speaker: '雨师妾',
+        portrait: 'yushiqie',
+        text: '拦你?我给你指路呀——蜃妖就藏在水镜后面。它模仿谁不好,偏去模仿共工的样子,啧啧。',
+        actions: ['quest:talk:dlg_npc_yushiqie'],
+        next: 'p4',
+      },
+      p4: {
+        speaker: '雨师妾',
+        portrait: 'yushiqie',
+        text: '小神医,打完记得来谢我。也许……我会告诉你一点关于"沉渊之毒"的事哦。',
+        end: true,
+      },
+    },
+  },
+  dlg_npc_yushiqie_2: {
+    root: 'start',
+    nodes: {
+      start: {
+        speaker: '雨师妾',
+        portrait: 'yushiqie',
+        text: '沉渊之毒,解药只有两味引子:昆仑蟠桃的核,和幽都还魂草。去不去,随你。',
+        end: true,
+      },
+    },
+  },
+
+  /* ---- 终章:共工对峙 ---- */
+  dlg_gonggong: {
+    root: 'start',
+    nodes: {
+      start: {
+        speaker: '共工',
+        portrait: 'gonggong',
+        text: '神农的传人?呵……颛顼的假诏、五族的倾轧、毒杀共主的黑手——你们"正道",哪一样干净?',
+        next: 'p2',
+      },
+      p2: {
+        speaker: '赤松',
+        portrait: 'player',
+        text: '我不为五族来,也不为你来。我为大荒的苍生来。',
+        next: 'p3',
+      },
+      p3: {
+        speaker: '共工',
+        portrait: 'gonggong',
+        text: '苍生?那就让你看看,天柱折、地维绝之后,你们的苍生值几斤几两!',
+        actions: ['quest:talk:dlg_gonggong'],
+        end: true,
+      },
+    },
+  },
+
+  /* ---- 终章结局过场后 ---- */
+  dlg_ending: {
+    root: 'start',
+    nodes: {
+      start: {
+        speaker: '赤松',
+        portrait: 'player',
+        text: '天柱断了……西北的天穹塌下来,洪水自地底涌出。师尊,这就是你说的"天下将倾"吗?',
+        next: 'p2',
+      },
+      p2: {
+        speaker: '赤松',
+        portrait: 'player',
+        text: '女娲氏的传说里,天是可以补的。(续章·未完)',
+        end: true,
+      },
+    },
+  },
 };

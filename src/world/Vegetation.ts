@@ -11,8 +11,15 @@ export interface Clearing {
   radius: number;
 }
 
+/** 地形采样接口(Terrain 与主题地图工厂共用) */
+export interface TerrainSampler {
+  height(x: number, z: number): number;
+  slope(x: number, z: number): number;
+  noise: Noise2D;
+}
+
 interface ScatterOptions {
-  terrain: Terrain;
+  terrain: { height(x: number, z: number): number; slope(x: number, z: number): number };
   clearings: Clearing[];
   count: number;
   seed: number;
@@ -94,20 +101,27 @@ function setInstances(
 
 /**
  * 程序化植被与山石:松树 / 阔叶树 / 桃树 / 岩石,全部 InstancedMesh。
- * 记忆点辅助:桃树环绕神祠与水岸,形成"十里桃林"观感。
+ * density/tint 参数化(M7 主题地图复用);记忆点辅助:桃树环绕神祠与水岸。
  */
 export class Vegetation {
   readonly group = new THREE.Group();
   /** 本组产生的 draw call 数(自检用) */
   drawCalls = 0;
 
-  constructor(terrain: Terrain, clearings: Clearing[]) {
+  constructor(sampler: TerrainSampler, clearings: Clearing[], density = 1, tint?: [string, string]) {
+    const terrain = {
+      height: (x: number, z: number) => sampler.height(x, z),
+      slope: (x: number, z: number) => sampler.slope(x, z),
+      noise: sampler.noise,
+    };
     const rng = mulberry32(97001);
     let calls = 0;
+    const N = (n: number) => Math.round(n * density);
+    const pineTint = tint ?? ['#2e5943', '#4a7a50'];
 
     /* ---- 松树(高层坡地) ---- */
     const pines = scatter({
-      terrain, clearings, count: 260, seed: 101, yMin: WATER_LEVEL + 1.2, yMax: 30,
+      terrain, clearings, count: N(260), seed: 101, yMin: WATER_LEVEL + 1.2, yMax: 30,
       maxSlope: 0.62, rMin: 14, rMax: 150,
     });
     const trunkGeo = new THREE.CylinderGeometry(0.14, 0.26, 1.9, 6);
@@ -120,10 +134,10 @@ export class Vegetation {
     coneC.translate(0, 5.2, 0);
     const pineFoliage = mergeGeometries([coneA, coneB, coneC])!;
     {
-      const trunk = new THREE.InstancedMesh(trunkGeo, new THREE.MeshStandardMaterial({ color: '#5d4632', flatShading: true, roughness: 1 }), pines.length);
-      const foliage = new THREE.InstancedMesh(pineFoliage, new THREE.MeshStandardMaterial({ flatShading: true, roughness: 0.9 }), pines.length);
+      const trunk = new THREE.InstancedMesh(trunkGeo, new THREE.MeshStandardMaterial({ color: '#5d4632', flatShading: true, roughness: 1 }), Math.max(1, pines.length));
+      const foliage = new THREE.InstancedMesh(pineFoliage, new THREE.MeshStandardMaterial({ flatShading: true, roughness: 0.9 }), Math.max(1, pines.length));
       setInstances(trunk, pines, 0, new THREE.Color('#54402e'), new THREE.Color('#6b523a'), rng);
-      setInstances(foliage, pines, 0, new THREE.Color('#2e5943'), new THREE.Color('#4a7a50'), rng);
+      setInstances(foliage, pines, 0, new THREE.Color(pineTint[0]), new THREE.Color(pineTint[1]), rng);
       trunk.castShadow = foliage.castShadow = true;
       this.group.add(trunk, foliage);
       calls += 2;
@@ -131,7 +145,7 @@ export class Vegetation {
 
     /* ---- 阔叶树(低地) ---- */
     const leafies = scatter({
-      terrain, clearings, count: 110, seed: 202, yMin: WATER_LEVEL + 0.9, yMax: 12,
+      terrain, clearings, count: N(110), seed: 202, yMin: WATER_LEVEL + 0.9, yMax: 12,
       maxSlope: 0.5, rMin: 20, rMax: 130,
     });
     const blobA = new THREE.IcosahedronGeometry(1.5, 1);
@@ -142,8 +156,8 @@ export class Vegetation {
     blobB.translate(0.7, 2.6, 0.4);
     const leafCrown = mergeGeometries([blobA, blobB])!;
     {
-      const trunk = new THREE.InstancedMesh(trunkGeo, new THREE.MeshStandardMaterial({ color: '#63513a', flatShading: true, roughness: 1 }), leafies.length);
-      const crown = new THREE.InstancedMesh(leafCrown, new THREE.MeshStandardMaterial({ flatShading: true, roughness: 0.92 }), leafies.length);
+      const trunk = new THREE.InstancedMesh(trunkGeo, new THREE.MeshStandardMaterial({ color: '#63513a', flatShading: true, roughness: 1 }), Math.max(1, leafies.length));
+      const crown = new THREE.InstancedMesh(leafCrown, new THREE.MeshStandardMaterial({ flatShading: true, roughness: 0.92 }), Math.max(1, leafies.length));
       setInstances(trunk, leafies, 0, new THREE.Color('#584634'), new THREE.Color('#6e5940'), rng);
       setInstances(crown, leafies, 0, new THREE.Color('#557a48'), new THREE.Color('#77955a'), rng);
       trunk.castShadow = crown.castShadow = true;
@@ -153,12 +167,12 @@ export class Vegetation {
 
     /* ---- 桃树(水岸点缀,记忆点) ---- */
     const peaches = scatter({
-      terrain, clearings, count: 46, seed: 303, yMin: WATER_LEVEL + 0.7, yMax: 6,
+      terrain, clearings, count: N(46), seed: 303, yMin: WATER_LEVEL + 0.7, yMax: 6,
       maxSlope: 0.42, rMin: 16, rMax: 42,
     });
     {
-      const trunk = new THREE.InstancedMesh(trunkGeo, new THREE.MeshStandardMaterial({ color: '#6d4a38', flatShading: true, roughness: 1 }), peaches.length);
-      const blossom = new THREE.InstancedMesh(leafCrown, new THREE.MeshStandardMaterial({ flatShading: true, roughness: 0.85 }), peaches.length);
+      const trunk = new THREE.InstancedMesh(trunkGeo, new THREE.MeshStandardMaterial({ color: '#6d4a38', flatShading: true, roughness: 1 }), Math.max(1, peaches.length));
+      const blossom = new THREE.InstancedMesh(leafCrown, new THREE.MeshStandardMaterial({ flatShading: true, roughness: 0.85 }), Math.max(1, peaches.length));
       setInstances(trunk, peaches, 0, new THREE.Color('#63422f'), new THREE.Color('#7a5138'), rng);
       setInstances(blossom, peaches, 0, new THREE.Color('#d98a94'), new THREE.Color('#f2c6c0'), rng);
       trunk.castShadow = blossom.castShadow = true;
@@ -168,7 +182,7 @@ export class Vegetation {
 
     /* ---- 岩石 ---- */
     const rocks = scatter({
-      terrain, clearings, count: 110, seed: 404, yMin: WATER_LEVEL - 2, yMax: 42,
+      terrain, clearings, count: N(110), seed: 404, yMin: WATER_LEVEL - 2, yMax: 42,
       maxSlope: 0.9, rMin: 8, rMax: 165,
     });
     const rockGeo = new THREE.IcosahedronGeometry(1, 1);
@@ -183,7 +197,7 @@ export class Vegetation {
         pos.setXYZ(i, x * d, y * d * 0.78, z * d);
       }
       rockGeo.computeVertexNormals();
-      const rocksMesh = new THREE.InstancedMesh(rockGeo, new THREE.MeshStandardMaterial({ flatShading: true, roughness: 0.95 }), rocks.length);
+      const rocksMesh = new THREE.InstancedMesh(rockGeo, new THREE.MeshStandardMaterial({ flatShading: true, roughness: 0.95 }), Math.max(1, rocks.length));
       setInstances(rocksMesh, rocks, -0.25, new THREE.Color('#6f7468'), new THREE.Color('#8a8d7f'), rng);
       rocksMesh.castShadow = rocksMesh.receiveShadow = true;
       this.group.add(rocksMesh);

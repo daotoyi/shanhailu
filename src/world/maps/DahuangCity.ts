@@ -130,6 +130,28 @@ class DahuangCityMap implements BuiltMap {
     this.group.add(moat.mesh);
     this.waters.push(moat);
 
+    /* 南征门(M7:→九黎) */
+    {
+      const pad = buildTeleporterPad();
+      pad.group.position.set(30, this.heightAt(30, -6) + 0.1, -6);
+      this.group.add(pad.group);
+      this.dynamics.push(pad);
+      this.colliders.push(
+        { x: 27.9, z: -8.1, r: 0.4 }, { x: 32.1, z: -8.1, r: 0.4 },
+        { x: 27.9, z: -3.9, r: 0.4 }, { x: 32.1, z: -3.9, r: 0.4 },
+      );
+      this.teleporters.push({
+        id: 'to-jiuli',
+        pos: new THREE.Vector2(30, -6),
+        radius: 2.0,
+        targetMapId: 'jiuli-nanjiang',
+        targetSpawnId: 'entry',
+        label: '九黎南疆',
+        group: pad.group,
+        update: (elapsed) => this.updatePad(pad, elapsed),
+      });
+    }
+
     this.minimap = bakeMinimap(256, 110, (x, z) => {
       const h = this.heightAt(x, z);
       // 广场/建筑/城墙手绘 tint

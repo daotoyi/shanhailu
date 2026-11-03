@@ -7,6 +7,9 @@ const PORTRAIT_COLORS: Record<string, string> = {
   player: '#3f6f5f',
   master: '#8a7355',
   courier: '#6b5b45',
+  chiyou: '#8a3b2e',
+  yushiqie: '#3f6f7a',
+  gonggong: '#2f4a6a',
   npc: '#556',
 };
 
@@ -108,7 +111,9 @@ export class DialogUIDom implements IDialogUI {
   private charOf(portrait?: string): { label: string; color: string } {
     const key = portrait ?? 'npc';
     const color = PORTRAIT_COLORS[key] ?? '#556';
-    const label = key === 'player' ? '松' : key === 'master' ? '翁' : key === 'courier' ? '驿' : '民';
+    const label =
+      key === 'player' ? '松' : key === 'master' ? '翁' : key === 'courier' ? '驿'
+      : key === 'chiyou' ? '尤' : key === 'yushiqie' ? '妾' : key === 'gonggong' ? '共' : '民';
     return { label, color };
   }
 

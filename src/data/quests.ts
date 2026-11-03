@@ -83,4 +83,105 @@ export const QUESTS: Record<string, QuestDef> = {
     ],
     rewards: { exp: 60, coins: 30, flags: { 'story.got_bencao': true } },
   },
+
+  /* ---------- 第二章《苗疆结义》 ---------- */
+  q_ch2_1: {
+    id: 'q_ch2_1',
+    name: '九黎·禁地',
+    type: 'main',
+    chapter: 'ch2',
+    summary: '南疆九黎,蚩尤在图腾柱下等你。寨中禁地有傀儡凶兽挡路。',
+    prereq: ['q_ch1_1'],
+    steps: [
+      { desc: '与蚩尤交谈', type: 'talk', target: 'dlg_npc_chiyou' },
+      { desc: '清剿禁地傀儡凶兽', type: 'kill', target: 'puppet', count: 3 },
+    ],
+    rewards: { exp: 200, coins: 60, flags: { 'story.ch2_sworn': true } },
+  },
+
+  /* ---------- 第三章《汤谷十日》 ---------- */
+  q_ch3_1: {
+    id: 'q_ch3_1',
+    name: '汤谷·金乌',
+    type: 'main',
+    chapter: 'ch3',
+    summary: '扶桑树上十日并出,大地焦枯。金乌落在了温泉之畔。',
+    prereq: ['q_ch2_1'],
+    steps: [
+      { desc: '击败三足金乌', type: 'kill', target: 'golden_crow', count: 1 },
+    ],
+    rewards: { exp: 400, coins: 120, flags: { 'story.ch3_crow': true } },
+  },
+
+  /* ---------- 第四章《蜃楼迷踪》 ---------- */
+  q_ch4_1: {
+    id: 'q_ch4_1',
+    name: '蜃楼·幻影',
+    type: 'main',
+    chapter: 'ch4',
+    summary: '海市蜃楼中的迷城,雨师妾的笑声在雾里。蜃妖藏在水镜之后。',
+    prereq: ['q_ch3_1'],
+    steps: [
+      { desc: '与雨师妾交谈', type: 'talk', target: 'dlg_npc_yushiqie' },
+      { desc: '揭穿并击败蜃妖', type: 'kill', target: 'mirage_demon', count: 1 },
+    ],
+    rewards: { exp: 480, coins: 140, flags: { 'story.ch4_mirage': true } },
+  },
+
+  /* ---------- 第五章《昆仑蟠桃会》 ---------- */
+  q_ch5_1: {
+    id: 'q_ch5_1',
+    name: '昆仑·刺客',
+    type: 'main',
+    chapter: 'ch5',
+    summary: '瑶池蟠桃会群英齐聚,水族的刀藏在庆功酒里。',
+    prereq: ['q_ch4_1'],
+    steps: [
+      { desc: '击败水族刺客', type: 'kill', target: 'water_assassin', count: 1 },
+    ],
+    rewards: { exp: 560, coins: 160, flags: { 'story.ch5_assassin': true } },
+  },
+
+  /* ---------- 第六章《幽都问魂》 ---------- */
+  q_ch6_1: {
+    id: 'q_ch6_1',
+    name: '幽都·问魂',
+    type: 'main',
+    chapter: 'ch6',
+    summary: '为查神农中毒的真相,你踏进幽都鬼界。鬼王拦在奈何之前。',
+    prereq: ['q_ch5_1'],
+    steps: [
+      { desc: '击败幽都鬼王', type: 'kill', target: 'ghost_king', count: 1 },
+    ],
+    rewards: { exp: 680, coins: 200, flags: { 'story.ch6_ghost': true } },
+  },
+
+  /* ---------- 第七章《水妖之乱》 ---------- */
+  q_ch7_1: {
+    id: 'q_ch7_1',
+    name: '水泽·相柳',
+    type: 'main',
+    chapter: 'ch7',
+    summary: '相柳率水妖作乱,九州始涝。九首蛇身,毒涎成泽。',
+    prereq: ['q_ch6_1'],
+    steps: [
+      { desc: '诛杀相柳', type: 'kill', target: 'xiangliu', count: 1 },
+    ],
+    rewards: { exp: 860, coins: 260, flags: { 'story.ch7_xiangliu': true } },
+  },
+
+  /* ---------- 终章《不周天倾》 ---------- */
+  q_ch8_1: {
+    id: 'q_ch8_1',
+    name: '不周·天倾',
+    type: 'main',
+    chapter: 'ch8',
+    summary: '共工败走不周山。他若怒触天柱,天倾地陷,洪水滔天。',
+    prereq: ['q_ch7_1'],
+    steps: [
+      { desc: '与共工对峙', type: 'talk', target: 'dlg_gonggong' },
+      { desc: '决战共工', type: 'kill', target: 'gonggong', count: 1 },
+    ],
+    rewards: { exp: 1200, coins: 400, flags: { 'story.ch8_done': true } },
+  },
 };

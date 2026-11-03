@@ -39,6 +39,33 @@ const CIN_CH1_END: CinematicDef = {
   onEndActions: ['flag:story.ch1_done'],
 };
 
+/** 终章结局过场:不周天倾(留续章) */
+const CIN_ENDING: CinematicDef = {
+  id: 'cin_ending',
+  keyframes: [
+    { pos: [16, 6, -18], lookAt: [-6, 20, -40], dur: 5.0 },
+    { pos: [2, 3.4, -24], lookAt: [-6, 24, -40], dur: 4.6, ease: 'inout' },
+    { pos: [-10, 10, -34], lookAt: [-30, 6, -10], dur: 5.0 },
+  ],
+  subtitles: [
+    { at: 0.5, dur: 3.6, text: '共工败退,却猛然回身,用尽全力撞向不周山——' },
+    { at: 4.6, dur: 3.6, text: '天柱折,地维绝。天倾西北,水潦尘埃归东南。' },
+    { at: 8.8, dur: 3.8, text: '洪水滔天而来。少年握紧神农尺,站进了风雨里。(续章·未完)' },
+  ],
+  onEndActions: ['flag:story.ending_seen'],
+};
+
+/** 章节→地图与战斗波 */
+const CHAPTER_WAVES: Record<string, { mapId: string }> = {
+  q_ch2_1: { mapId: 'jiuli-nanjiang' },
+  q_ch3_1: { mapId: 'tanggu' },
+  q_ch4_1: { mapId: 'shenlou-city' },
+  q_ch5_1: { mapId: 'kunlun' },
+  q_ch6_1: { mapId: 'youdu' },
+  q_ch7_1: { mapId: 'shuize' },
+  q_ch8_1: { mapId: 'buzhou' },
+};
+
 const STEALTH_RESET = new THREE.Vector3(0, 0, -13);
 
 /**
@@ -68,9 +95,10 @@ export class ScenarioDirector {
       onShrineMenu: () => void;
       onStealthFail: () => void;
       onTeleportRequest: (mapId: string) => void;
-      spawnWave: (kind: 'prologue_battle' | 'clear') => void;
+      spawnWave: (kind: 'prologue_battle' | 'clear' | 'ch2' | 'ch3' | 'ch4' | 'ch5' | 'ch6' | 'ch7' | 'ch8') => void;
       openShop: () => void;
       onHerbPicked: (herbId: string) => void;
+      combatEnemyCount: () => number;
     },
   ) {
     this.cin.bindActions((a) => this.applyAction(a));
@@ -149,6 +177,33 @@ export class ScenarioDirector {
         const marker = this.triggers.makeMarker(new THREE.Vector3(0, heightFn(0, -30), -30));
         scene.add(marker);
         this.markers.push(marker);
+      }
+    } else {
+      // ============ M7:第二章~终章 ============
+      const mapId = this.world.maps.def.id;
+      const questId = Object.keys(CHAPTER_WAVES).find((q) => this.quests.isActive(q));
+      const waveDef = questId ? CHAPTER_WAVES[questId]! : null;
+
+      // 章节 NPC
+      if (mapId === 'jiuli-nanjiang') {
+        this.npcs.push(this.makeNpc('npc_chiyou', '蚩尤', 'chiyou', 'miao', [-3, -8], 2.6, heightAt));
+      }
+      if (mapId === 'shenlou-city') {
+        this.npcs.push(this.makeNpc('npc_yushiqie', '雨师妾', 'yushiqie', 'shui', [4, -10], 0.4, heightAt));
+      }
+      if (mapId === 'buzhou' && questId === 'q_ch8_1' && this.quests.getActiveQuest('q_ch8_1')?.stepIndex === 0) {
+        // 共工(对峙形态)
+        this.npcs.push(this.makeNpc('npc_gonggong', '共工', 'gonggong', 'shui', [0, -26], 3.4, heightAt));
+      }
+
+      // 章节战斗波(地图匹配 + 敌人未刷)
+      if (waveDef && waveDef.mapId === mapId && this.hooks.combatEnemyCount() === 0) {
+        const chKey = questId!.replace('q_', '').split('_')[0]!;
+        if (questId === 'q_ch8_1' && this.quests.getActiveQuest('q_ch8_1')!.stepIndex === 0) {
+          // 对峙阶段:不刷 Boss
+        } else {
+          this.hooks.spawnWave(chKey as 'ch2');
+        }
       }
     }
   }
@@ -251,6 +306,17 @@ export class ScenarioDirector {
       return 'dlg_npc_master_done';
     }
     if (npcId === 'npc_courier') return 'dlg_npc_courier';
+    if (npcId === 'npc_chiyou') {
+      return this.quests.isActive('q_ch2_1') && this.quests.getActiveQuest('q_ch2_1')!.stepIndex === 0
+        ? 'dlg_npc_chiyou'
+        : 'dlg_npc_chiyou_done';
+    }
+    if (npcId === 'npc_yushiqie') {
+      return this.quests.isActive('q_ch4_1') && this.quests.getActiveQuest('q_ch4_1')!.stepIndex === 0
+        ? 'dlg_npc_yushiqie'
+        : 'dlg_npc_yushiqie_2';
+    }
+    if (npcId === 'npc_gonggong') return 'dlg_gonggong';
     return null;
   }
 
@@ -376,14 +442,65 @@ export class ScenarioDirector {
     } else if (id === 'q_ch1_1') {
       // 月下托孤过场
       this.playCinematic(CIN_CH1_END);
+      this.state.setChapter('ch2');
+      this.quests.accept('q_ch2_1');
+      this.markChapterDirty();
+    } else if (id === 'q_ch2_1') {
+      this.state.setChapter('ch3');
+      this.quests.accept('q_ch3_1');
+      this.markChapterDirty();
+      this.tracker.showBanner('前往东海 · 汤谷', 2400);
+      this.hooks.onAutosaveHint();
+    } else if (id === 'q_ch3_1') {
+      this.state.setChapter('ch4');
+      this.quests.accept('q_ch4_1');
+      this.markChapterDirty();
+      this.tracker.showBanner('海市蜃楼 · 蜃楼迷城', 2400);
+      this.hooks.onAutosaveHint();
+    } else if (id === 'q_ch4_1') {
+      this.state.setChapter('ch5');
+      this.quests.accept('q_ch5_1');
+      this.markChapterDirty();
+      this.tracker.showBanner('西行昆仑 · 蟠桃会', 2400);
+      this.hooks.onAutosaveHint();
+    } else if (id === 'q_ch5_1') {
+      this.state.setChapter('ch6');
+      this.quests.accept('q_ch6_1');
+      this.markChapterDirty();
+      this.tracker.showBanner('魂入幽都 · 问魂', 2400);
+      this.hooks.onAutosaveHint();
+    } else if (id === 'q_ch6_1') {
+      this.state.setChapter('ch7');
+      this.quests.accept('q_ch7_1');
+      this.markChapterDirty();
+      this.tracker.showBanner('水妖作乱 · 大荒水泽', 2400);
+      this.hooks.onAutosaveHint();
+    } else if (id === 'q_ch7_1') {
+      this.state.setChapter('ch8');
+      this.quests.accept('q_ch8_1');
+      this.markChapterDirty();
+      this.tracker.showBanner('终章 · 不周天倾', 2600);
+      this.hooks.onAutosaveHint();
+    } else if (id === 'q_ch8_1') {
+      // 结局过场 + 尾声对话
+      this.playCinematic(CIN_ENDING);
+      this.cinBindEnd(() => this.dialogs.start('dlg_ending', () => {
+        this.tracker.showBanner('《大荒山海录》本卷终 · 感谢游玩', 4000);
+      }));
+      this.hooks.onAutosaveHint();
     }
+  }
+
+  private cinEndCb: (() => void) | null = null;
+  private cinBindEnd(cb: () => void): void {
+    this.cinEndCb = cb;
   }
 
   playCinematic(def: CinematicDef): void {
     this.cin.play(def, this.cameraRef, () => {
-      if (def.id === 'cin_opening') {
-        // 开场运镜后接第一个任务(已在 onEndActions accept)
-      }
+      const cb = this.cinEndCb;
+      this.cinEndCb = null;
+      cb?.();
     });
   }
 

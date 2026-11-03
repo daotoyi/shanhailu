@@ -376,11 +376,43 @@ async function boot(): Promise<void> {
         return;
       }
       combat.clearEnemies();
-      combat.spawnMonster('yigui', -6, -2);
-      combat.spawnMonster('yigui', 10, -4);
-      combat.spawnMonster('yigui_boss', 0, 14);
-      tracker.showBanner('瘴母已现身于池塘之畔', 2400);
+      const def = world.maps.def.id;
+      const pos = (x: number, z: number) => [x, world.heightAt(x, z), z] as const;
+      if (kind === 'prologue_battle') {
+        combat.spawnMonster('yigui', -6, -2);
+        combat.spawnMonster('yigui', 10, -4);
+        combat.spawnMonster('yigui_boss', 0, 14);
+        tracker.showBanner('瘴母已现身于池塘之畔', 2400);
+        return;
+      }
+      if (def === 'jiuli-nanjiang' && kind === 'ch2') {
+        combat.spawnMonster('puppet', -14, -18);
+        combat.spawnMonster('puppet', 14, -16);
+        combat.spawnMonster('puppet', 0, -38);
+      } else if (def === 'tanggu' && kind === 'ch3') {
+        combat.spawnMonster('golden_crow', 0, -30);
+        tracker.showBanner('金乌振翅 · 十日齐辉', 2400);
+      } else if (def === 'shenlou-city' && kind === 'ch4') {
+        combat.spawnMonster('mirage_demon', 0, -26);
+      } else if (def === 'kunlun' && kind === 'ch5') {
+        combat.spawnMonster('water_assassin', 0, -24);
+        tracker.showBanner('刺客出自庆功酒!', 2400);
+      } else if (def === 'youdu' && kind === 'ch6') {
+        combat.spawnMonster('ghost_king', 0, -28);
+      } else if (def === 'shuize' && kind === 'ch7') {
+        combat.spawnMonster('yigui', -12, -12);
+        combat.spawnMonster('yigui', 12, -10);
+        combat.spawnMonster('xiangliu', 0, -30);
+        tracker.showBanner('九首搅动泽国 · 相柳现身', 2600);
+      } else if (def === 'buzhou' && kind === 'ch8') {
+        combat.spawnMonster('water_assassin', -10, -16);
+        combat.spawnMonster('water_assassin', 10, -16);
+        combat.spawnMonster('gonggong', 0, -34);
+        tracker.showBanner('共工触山在即 · 决战!', 2600);
+      }
+      void pos;
     },
+    combatEnemyCount: () => combat.enemies.filter((e) => e.alive).length,
   });
   directorRef = director;
   director.cameraRef = camera;
