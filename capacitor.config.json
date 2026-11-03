@@ -1,0 +1,21 @@
+{
+  "appId": "com.dahua.shanhai",
+  "appName": "大荒山海录",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "backgroundColor": "#17130e"
+  },
+  "ios": {
+    "backgroundColor": "#17130e",
+    "contentInset": "always"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "backgroundColor": "#17130e",
+      "showSpinner": false
+    }
+  }
+}

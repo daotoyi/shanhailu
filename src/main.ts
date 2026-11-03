@@ -44,6 +44,7 @@ import { QuestTracker } from './ui/QuestTracker.js';
 import { SaveMenuUI } from './ui/SaveMenuUI.js';
 import { PlayerHUD } from './ui/PlayerHUD.js';
 import { GamePanels } from './ui/GamePanels.js';
+import { CanvasLoading } from './ui/canvas/CanvasLoading.js';
 import { DebugCamera } from './world/DebugCamera.js';
 
 const FONT_SOURCE_LABEL: Record<FontSource, string> = {
@@ -61,7 +62,9 @@ async function boot(): Promise<void> {
   const bus = new EventBus();
   provide<EventBus>(ServiceKey.Bus, bus);
   const ui = new UIRoot();
-  const loading = new LoadingScreen();
+  // M9 POC:?ui=canvas 切换 canvas UI 后端(与 DOM 后端同接口)
+  const useCanvasUI = new URLSearchParams(location.search).get('ui') === 'canvas';
+  const loading = useCanvasUI ? new CanvasLoading(ui) : new LoadingScreen();
   const tween = new TweenEngine();
 
   loading.setProgress(0.06, '初始化平台层');
