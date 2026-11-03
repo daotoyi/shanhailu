@@ -9,6 +9,8 @@ export interface AppEventMap {
   'input:action': { action: string; phase: 'start' | 'end' };
   'debug:toggleF3': Record<string, never>;
   'quality:changed': { level: string };
+  'world:teleport': { mapId: string; spawnId: string; label: string };
+  'world:boundary': Record<string, never>;
 }
 
 type Handler<K extends keyof AppEventMap> = (payload: AppEventMap[K]) => void;

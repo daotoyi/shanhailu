@@ -60,17 +60,23 @@ function buildRidge(spec: LayerSpec, horizonColor: THREE.Color, mountainColor: T
 
 export class SilhouetteRing {
   readonly group = new THREE.Group();
+  private readonly meshes: THREE.Mesh[] = [];
+  private readonly skirt: THREE.Mesh;
+  private readonly horizon: THREE.Color;
+  private mountain = new THREE.Color('#3c5a54');
 
   constructor(horizonColor: THREE.Color) {
-    const nearMtn = new THREE.Color('#3c5a54');
+    this.horizon = horizonColor.clone();
     for (const spec of LAYERS) {
-      this.group.add(buildRidge(spec, horizonColor, nearMtn));
+      const mesh = buildRidge(spec, horizonColor, this.mountain);
+      this.meshes.push(mesh);
+      this.group.add(mesh);
     }
     // 山脚雾带:一环渐隐裙边,柔化剪影与地形衔接
-    const skirt = new THREE.Mesh(
+    this.skirt = new THREE.Mesh(
       new THREE.CylinderGeometry(LAYERS[0]!.radius, LAYERS[0]!.radius + 60, 26, 64, 1, true),
       new THREE.MeshBasicMaterial({
-        color: horizonColor.clone().lerp(nearMtn, 0.25),
+        color: horizonColor.clone().lerp(this.mountain, 0.25),
         transparent: true,
         opacity: 0.35,
         fog: false,
@@ -78,9 +84,19 @@ export class SilhouetteRing {
         depthWrite: false,
       }),
     );
-    skirt.position.y = -2;
-    skirt.renderOrder = -8;
-    this.group.add(skirt);
+    this.skirt.position.y = -2;
+    this.skirt.renderOrder = -8;
+    this.group.add(this.skirt);
     void lerp;
+  }
+
+  /** 换远山基色(切图时重着色) */
+  setMountainColor(c: THREE.Color): void {
+    this.mountain.copy(c);
+    LAYERS.forEach((spec, i) => {
+      const mat = this.meshes[i]!.material as THREE.MeshBasicMaterial;
+      mat.color.copy(c).lerp(this.horizon, spec.hazeMix);
+    });
+    (this.skirt.material as THREE.MeshBasicMaterial).color.copy(this.horizon).lerp(c, 0.25);
   }
 }
