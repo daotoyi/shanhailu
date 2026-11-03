@@ -6,6 +6,8 @@ import { WATER_LEVEL, Terrain } from './Terrain.js';
 import { Vegetation } from './Vegetation.js';
 import { Shrine } from './Shrine.js';
 import { Fireflies } from './Fireflies.js';
+import { Player } from '../actor/Player.js';
+import type { InputManager } from '../core/Input/InputManager.js';
 
 export const FOG_COLOR = new THREE.Color('#9aa893');
 
@@ -25,8 +27,9 @@ export class DemoValley {
   private readonly fireflies: Fireflies;
   private readonly sky: SkyDome;
   private readonly terrain: Terrain;
+  readonly player: Player;
 
-  constructor() {
+  constructor(input: InputManager) {
     this.scene.fog = new THREE.FogExp2(FOG_COLOR, 0.0095);
     this.scene.background = FOG_COLOR.clone().multiplyScalar(0.9);
 
@@ -91,13 +94,20 @@ export class DemoValley {
       new THREE.Vector3(12, 0, -2),
     ]);
     this.scene.add(this.fireflies.points);
+
+    /* 玩家(药谷学徒) */
+    this.player = new Player(input, (x, z) => this.terrain.height(x, z), this.spawnPoint.clone());
+    this.scene.add(this.player.rig.root);
   }
 
-  update(dt: number, elapsed: number): void {
+  /** 地形高度查询(相机避让/移动贴合共用) */
+  heightAt = (x: number, z: number): number => this.terrain.height(x, z);
+
+  update(dt: number, elapsed: number, camYaw: number): void {
     this.water.update(elapsed);
     this.shrine.update(elapsed);
     this.fireflies.update(elapsed);
-    void dt;
+    this.player.update(dt, elapsed, camYaw);
   }
 
   /** 相机对齐天空太阳方向(供后处理与天空共享) */

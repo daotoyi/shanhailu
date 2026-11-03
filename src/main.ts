@@ -9,10 +9,12 @@ import { PostFX } from './render/PostFX.js';
 import { QualityManager } from './render/Quality.js';
 import { DebugCamera } from './world/DebugCamera.js';
 import { DemoValley } from './world/DemoValley.js';
+import { FollowCamera } from './world/FollowCamera.js';
 import { ensureGameFonts, type FontSource } from './ui/FontManager.js';
 import { F3Panel } from './ui/F3Panel.js';
 import { LoadingScreen } from './ui/LoadingScreen.js';
 import { UIRoot } from './ui/UIRoot.js';
+import { TouchControls } from './ui/dom/TouchControls.js';
 import { TweenEngine } from './ui/framework/Tween.js';
 
 const FONT_SOURCE_LABEL: Record<FontSource, string> = {
@@ -32,7 +34,7 @@ async function boot(): Promise<void> {
   const ui = new UIRoot();
   const loading = new LoadingScreen();
   const tween = new TweenEngine();
-  void tween; // M0 面板动效走 CSS;数值补间自 M3 起由各系统使用
+  void tween; // 面板动效走 CSS;数值补间自 M3 起由各系统使用
 
   loading.setProgress(0.06, '初始化平台层');
   const p = initPAL();
@@ -42,12 +44,10 @@ async function boot(): Promise<void> {
   // 初始尺寸(PAL onResize 注册即回调一次)
   let winW = 1280;
   let winH = 720;
-  let winDpr = 1;
   {
-    const off = p.platform.onResize((w, h, dpr) => {
+    const off = p.platform.onResize((w, h) => {
       winW = w;
       winH = h;
-      winDpr = dpr;
     });
     off();
   }
@@ -55,7 +55,9 @@ async function boot(): Promise<void> {
 
   loading.setProgress(0.16, '雕凿山河');
   await nextFrame();
-  const valley = new DemoValley();
+  const input = new InputManager(bus);
+  provide<typeof input>(ServiceKey.Input, input);
+  const valley = new DemoValley(input);
   await nextFrame();
 
   loading.setProgress(0.62, '汇聚灵光');
@@ -72,11 +74,22 @@ async function boot(): Promise<void> {
     postfx.setSize(width, height);
   });
 
-  const input = new InputManager(bus);
-  provide<typeof input>(ServiceKey.Input, input);
   engine.onFrameEnd(() => input.endFrame());
 
+  const followCam = new FollowCamera(valley.camera, input, valley.heightAt);
   const debugCam = new DebugCamera(valley.camera, input);
+  let useDebugCam = false;
+  bus.on('input:action', ({ action, phase }) => {
+    if (action === 'toggleDebugCam' && phase === 'start') {
+      useDebugCam = !useDebugCam;
+      if (!useDebugCam) followCam.snapTo(valley.player.position);
+    }
+  });
+  followCam.snapTo(valley.player.position);
+
+  const touch = new TouchControls(input, ui);
+  void touch;
+
   const f3 = new F3Panel(
     bus,
     {
@@ -84,6 +97,7 @@ async function boot(): Promise<void> {
       time: engine.time,
       camera: valley.camera,
       quality: () => quality.current,
+      extra: () => (useDebugCam ? '调试相机(F4 切回)' : ''),
     },
     ui,
   );
@@ -92,8 +106,9 @@ async function boot(): Promise<void> {
   engine.renderer.info.autoReset = false;
   engine.onTick((dt, elapsed) => {
     engine.renderer.info.reset();
-    debugCam.update(dt);
-    valley.update(dt, elapsed);
+    if (useDebugCam) debugCam.update(dt);
+    else followCam.update(dt, valley.player.position);
+    valley.update(dt, elapsed, followCam.currentYaw);
     postfx.render(dt);
     tween.update(dt);
     f3.update(dt);
@@ -111,6 +126,14 @@ async function boot(): Promise<void> {
     await p.audio.unlock(); // 用户手势内解锁音频(后续 BGM/SFX 复用)
     loading.close();
     engine.start();
+    // dev 调试钩子(与 F3 同性质;自动化自测/排查用)
+    (globalThis as Record<string, unknown>)['__shanhai'] = {
+      valley,
+      player: valley.player,
+      input,
+      engine,
+      quality,
+    };
     console.info(
       `[大荒山海录] 启动完成 · 字体=${FONT_SOURCE_LABEL[fontSource]} · PAL=${p.platform.id}`,
     );

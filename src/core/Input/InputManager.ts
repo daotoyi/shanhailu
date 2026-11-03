@@ -16,6 +16,21 @@ export class InputManager {
   private zoom = 0;
   private rmbDown = false;
   private unsubs: (() => void)[] = [];
+  /** 触屏虚拟摇杆向量(x 右 / z 前,归一化) */
+  private virtualMoveX = 0;
+  private virtualMoveZ = 0;
+
+  /** 触屏控件注入:摇杆向量 */
+  setVirtualMove(x: number, z: number): void {
+    this.virtualMoveX = x;
+    this.virtualMoveZ = z;
+  }
+
+  /** 触屏控件注入:视角拖拽增量 */
+  addVirtualLook(dx: number, dy: number): void {
+    this.lookX += dx;
+    this.lookY += dy;
+  }
 
   constructor(private readonly bus: EventBus) {
     this.attach();
@@ -83,10 +98,12 @@ export class InputManager {
     return false;
   }
 
-  /** 移动向量为相机空间:x 右 / z 前 */
+  /** 移动向量为相机空间:x 右 / z 前(键盘 + 虚拟摇杆合并) */
   moveVector(): { x: number; z: number } {
-    const x = (this.isDown('right') ? 1 : 0) - (this.isDown('left') ? 1 : 0);
-    const z = (this.isDown('forward') ? 1 : 0) - (this.isDown('back') ? 1 : 0);
+    const kx = (this.isDown('right') ? 1 : 0) - (this.isDown('left') ? 1 : 0);
+    const kz = (this.isDown('forward') ? 1 : 0) - (this.isDown('back') ? 1 : 0);
+    const x = kx + this.virtualMoveX;
+    const z = kz + this.virtualMoveZ;
     const len = Math.hypot(x, z);
     return len > 1 ? { x: x / len, z: z / len } : { x, z };
   }

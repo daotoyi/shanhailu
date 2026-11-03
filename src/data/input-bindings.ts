@@ -18,7 +18,8 @@ export type InputAction =
   | 'camUp'
   | 'camDown'
   | 'sprint'
-  | 'toggleDebug';
+  | 'toggleDebug'
+  | 'toggleDebugCam';
 
 export const DEFAULT_KEY_BINDINGS: Readonly<Record<string, InputAction>> = {
   KeyW: 'forward',
@@ -35,4 +36,5 @@ export const DEFAULT_KEY_BINDINGS: Readonly<Record<string, InputAction>> = {
   KeyC: 'camDown',
   ShiftLeft: 'sprint',
   F3: 'toggleDebug',
+  F4: 'toggleDebugCam',
 };
