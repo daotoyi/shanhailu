@@ -69,6 +69,8 @@ export class ScenarioDirector {
       onStealthFail: () => void;
       onTeleportRequest: (mapId: string) => void;
       spawnWave: (kind: 'prologue_battle' | 'clear') => void;
+      openShop: () => void;
+      onHerbPicked: (herbId: string) => void;
     },
   ) {
     this.cin.bindActions((a) => this.applyAction(a));
@@ -209,6 +211,20 @@ export class ScenarioDirector {
   /** NPC/神祠交互点注册(每次地图构建后由 main 调用) */
   bindInteractables(): void {
     const heightAt = this.world.heightAt;
+    // 商铺(大荒城)
+    if (this.world.maps.def.id === 'dahuang-city') {
+      this.triggers.addInteractable({
+        id: 'city_shop',
+        pos: new THREE.Vector3(15, heightAt(15, 12), 12),
+        radius: 3.2,
+        prompt: '百草集 · 商铺',
+        onInteract: () => {
+          if (this.freezePlayer) return true;
+          this.hooks.openShop();
+          return true;
+        },
+      });
+    }
     // 神祠(仅药王谷)
     if (this.world.maps.def.id === 'yaowang-valley') {
       this.triggers.addInteractable({
@@ -297,6 +313,7 @@ export class ScenarioDirector {
       if (!h.picked && canInteract && !frozen && playerPos.distanceTo(h.pos) < 1.6) {
         h.pick();
         this.quests.progress('collect', h.herbId);
+        this.hooks.onHerbPicked(h.herbId);
         this.tracker.showBanner('采得 青茎芝 ×1', 1600);
       }
     }

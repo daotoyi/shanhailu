@@ -18,6 +18,13 @@ import { SaveSystem } from './gameplay/SaveSystem.js';
 import { DialogRunner } from './gameplay/DialogRunner.js';
 import { ScenarioDirector } from './gameplay/ScenarioDirector.js';
 import { CombatSystem } from './gameplay/CombatSystem.js';
+import { Inventory } from './gameplay/Inventory.js';
+import { Equipment } from './gameplay/Equipment.js';
+import { Progression } from './gameplay/Progression.js';
+import { Alchemy } from './gameplay/Alchemy.js';
+import { ITEMS, type ItemDef } from './data/items.js';
+import { MONSTERS } from './data/monsters.js';
+import { DROP_TABLE } from './data/progression.js';
 import { CinematicPlayer } from './render/Cinematic.js';
 import { ensureGameFonts, type FontSource } from './ui/FontManager.js';
 import { F3Panel } from './ui/F3Panel.js';
@@ -32,6 +39,7 @@ import { InteractPrompt } from './ui/InteractPrompt.js';
 import { QuestTracker } from './ui/QuestTracker.js';
 import { SaveMenuUI } from './ui/SaveMenuUI.js';
 import { PlayerHUD } from './ui/PlayerHUD.js';
+import { GamePanels } from './ui/GamePanels.js';
 import { DebugCamera } from './world/DebugCamera.js';
 
 const FONT_SOURCE_LABEL: Record<FontSource, string> = {
@@ -96,6 +104,17 @@ async function boot(): Promise<void> {
   const save = new SaveSystem(state, quests);
   const triggers = new TriggerSystem();
   const cin = new CinematicPlayer(ui);
+
+  /* ---- 成长/物品(M5) ---- */
+  const inventory = new Inventory();
+  const equipment = new Equipment(inventory);
+  const progression = new Progression(bus, inventory, () => equipment.bonus());
+  const alchemy = new Alchemy(inventory, equipment);
+  progression.recompute();
+  // 开局行囊:药锄 + 应急丹药
+  inventory.add('wp_hoe', 1);
+  inventory.add('pill_huixue', 3);
+  inventory.add('herb_qingjingzhi', 2);
   const dialogUI = new DialogUIDom(ui);
   let directorRef: ScenarioDirector | null = null;
   const dialogs = new DialogRunner(
@@ -131,6 +150,86 @@ async function boot(): Promise<void> {
   });
   combat.onPlayerDown = () => tracker.showBanner('力竭倒下……', 2200);
 
+  /* ---- M5:属性同步 / 武器可视 / 面板 ---- */
+  const equippedWeaponModel = (): 'hoe' | 'blade' | 'sword' | null => {
+    const w = equipment.slots['weapon'];
+    if (!w) return null;
+    return ITEMS[w.itemId]?.equip?.model ?? null;
+  };
+  const syncStats = (): void => {
+    const oldMax = combat.stats.block.maxHp;
+    const ratio = oldMax > 0 ? combat.stats.hp / oldMax : 1;
+    combat.stats.block = { ...progression.finalStats };
+    combat.stats.hp = Math.min(combat.stats.block.maxHp, Math.max(1, Math.round(ratio * combat.stats.block.maxHp)));
+    combat.stats.mp = Math.min(combat.stats.mp, combat.stats.block.maxMp);
+    world.player.setWeaponModel(equippedWeaponModel());
+  };
+  syncStats();
+  // 开局穿药锄
+  {
+    const idx = inventory.slots.findIndex((s) => s && ITEMS[s.itemId]?.equip);
+    if (idx >= 0) equipment.equipFromBag(idx);
+    syncStats();
+  }
+  bus.on('prog:levelup', ({ level }) => {
+    syncStats();
+    tracker.showBanner(`等级提升 · Lv.${level}`, 2000);
+  });
+  bus.on('prog:breakthrough', ({ realm, unlocks }) => {
+    syncStats();
+    tracker.showBanner(`突破!境界 · ${realm}`, 2600);
+    if (unlocks.length > 0) console.info(`[境界] 解锁:${unlocks.join('、')}`);
+  });
+  bus.on('quest:kill', ({ monsterId }) => {
+    quests.progress('kill', monsterId);
+    const def = MONSTERS[monsterId];
+    if (def) progression.gainExp(def.exp);
+    const table = DROP_TABLE[monsterId] ?? [];
+    for (const entry of table) {
+      if (Math.random() < entry.chance) {
+        const [cmin, cmax] = entry.count ?? [1, 1];
+        const n = cmin + Math.floor(Math.random() * (cmax - cmin + 1));
+        inventory.add(entry.itemId, n);
+      }
+    }
+    panels.markDirty();
+  });
+  combat.onPickup = (kind, amount) => {
+    if (kind === 'coin') inventory.coins += amount;
+    else {
+      const herbs = ['herb_qingjingzhi', 'herb_xuejiancao'];
+      inventory.add(herbs[Math.floor(Math.random() * herbs.length)]!, amount);
+    }
+    panels.markDirty();
+  };
+  const panels = new GamePanels(inventory, equipment, progression, alchemy, bus, ui, {
+    onUseItem: (bagIndex) => {
+      const def: ItemDef | null = inventory.consume(bagIndex);
+      if (!def?.effects) return;
+      const e = def.effects;
+      const potionBoost = progression.realmIndex >= 2 ? 1.25 : 1; // 真气被动·药理
+      if (e.healHp) combat.stats.heal(Math.round(e.healHp * potionBoost));
+      if (e.healMp) combat.stats.healMp(Math.round(e.healMp * potionBoost));
+      if (e.curePoison) combat.stats.poisonUntil = 0;
+      if (e.atkBuff) progression.applyBuff('atk', e.atkBuff.value, e.atkBuff.dur, engine.time.elapsed);
+      if (e.defBuff) progression.applyBuff('def', e.defBuff.value, e.defBuff.dur, engine.time.elapsed);
+      syncStats();
+      panels.markDirty();
+    },
+    onEquipChanged: () => {
+      progression.recompute();
+      syncStats();
+      panels.markDirty();
+    },
+  });
+  panels.onClosed(() => {
+    director.freezePlayer = false;
+  });
+  const openShop = (): void => {
+    panels.open('shop');
+    director.freezePlayer = true;
+  };
+
   /* ---- UI 层 ---- */
   const touch = new TouchControls(input, ui);
   void touch;
@@ -159,6 +258,9 @@ async function boot(): Promise<void> {
   const applySave = (data: NonNullable<ReturnType<SaveSystem['load']>>) => {
     state.deserialize(data);
     quests.deserialize(data.quests);
+    inventory.deserialize(data.bag ?? { slots: [], coins: 0 });
+    equipment.deserialize(data.equip ?? {});
+    progression.deserialize(data.prog ?? {});
     const def = MAPS[data.mapId];
     world.switchMap(data.mapId, def?.spawns[0]!.id ?? 'start');
     // 精确落位(存档点位姿)
@@ -169,8 +271,17 @@ async function boot(): Promise<void> {
     directorRef?.markChapterDirty();
     directorRef?.refreshEntities();
     directorRef?.bindInteractables();
+    progression.recompute();
+    syncStats();
+    panels.markDirty();
     tracker.refresh();
   };
+
+  const saveBlobExtra = () => ({
+    bag: inventory.serialize(),
+    equip: equipment.serialize(),
+    prog: progression.serialize(),
+  });
 
   const afterMapSwitch = (pos: THREE.Vector3): void => {
     minimap.setMap(world.maps.map);
@@ -191,7 +302,7 @@ async function boot(): Promise<void> {
 
   const director = new ScenarioDirector(world, triggers, state, quests, dialogs, cin, prompt, tracker, {
     onAutosaveHint: () => {
-      save.save(0, playerBlob(), world.maps.def.id);
+      save.save(0, playerBlob(), world.maps.def.id, saveBlobExtra());
       tracker.showBanner('自动存档完成', 1800);
     },
     onSaveAtShrine: () => {
@@ -207,6 +318,11 @@ async function boot(): Promise<void> {
       tracker.showBanner('行踪败露!退回谷中再试', 2200);
     },
     onTeleportRequest: (mapId) => teleportTo(mapId),
+    openShop: () => openShop(),
+    onHerbPicked: (herbId) => {
+      inventory.add(herbId, 1);
+      panels.markDirty();
+    },
     spawnWave: (kind) => {
       if (kind === 'clear') {
         combat.clearEnemies();
@@ -235,7 +351,7 @@ async function boot(): Promise<void> {
   /* ---- 神祠存档菜单 ---- */
   const saveMenu = new SaveMenuUI(ui, save, {
     onSave: (slot) => {
-      save.save(slot, playerBlob(), world.maps.def.id);
+      save.save(slot, playerBlob(), world.maps.def.id, saveBlobExtra());
       tracker.showBanner(`已存入档位 ${slot + 1}`, 1800);
     },
     onLoad: (slot) => {
@@ -261,8 +377,9 @@ async function boot(): Promise<void> {
   engine.onTick((dt, elapsed) => {
     engine.renderer.info.reset();
     state.playtimeSec += dt;
+    progression.update(elapsed);
     const interactPressed = input.consumePressed('interact');
-    const dialogFrozen = dialogs.isOpen || cin.isPlaying || director.freezePlayer;
+    const dialogFrozen = dialogs.isOpen || cin.isPlaying || director.freezePlayer || panels.isOpen || saveMenu.isOpen;
 
     if (useDebugCam) debugCam.update(dt);
     else if (!cin.isPlaying) followCam.update(dt, world.player.position);
@@ -281,6 +398,7 @@ async function boot(): Promise<void> {
     tracker.update(dt);
     hud.update(dt, combat.stats, combat.executor, combat.bossInfo);
     combat.hitfx.update(dt, 1280, 720);
+    panels.update();
     f3.update(dt);
   });
 
@@ -314,6 +432,11 @@ async function boot(): Promise<void> {
       save,
       combat,
       hud,
+      inventory,
+      equipment,
+      progression,
+      alchemy,
+      panels,
       switchMap: (m: string, s: string) => world.switchMap(m, s),
     };
     console.info(

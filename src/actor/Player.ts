@@ -48,6 +48,39 @@ export class Player {
     this.playOverride('dodge', 0.42);
   }
 
+  /** 武器可视(PROMPT §3.8):随装备切换挂到右手 */
+  private weaponMesh: THREE.Mesh | null = null;
+
+  setWeaponModel(model: 'hoe' | 'blade' | 'sword' | null): void {
+    if (this.weaponMesh) {
+      this.weaponMesh.removeFromParent();
+      this.weaponMesh.geometry.dispose();
+      (this.weaponMesh.material as THREE.Material).dispose();
+      this.weaponMesh = null;
+    }
+    if (!model) return;
+    let geo: THREE.BufferGeometry;
+    let color = '#8a7355';
+    if (model === 'hoe') {
+      geo = new THREE.BoxGeometry(0.05, 0.7, 0.05);
+    } else if (model === 'blade') {
+      geo = new THREE.BoxGeometry(0.045, 0.62, 0.014);
+      color = '#9fb8c8';
+    } else {
+      geo = new THREE.BoxGeometry(0.04, 0.78, 0.012);
+      color = '#c8d8e0';
+    }
+    const mesh = new THREE.Mesh(
+      geo,
+      new THREE.MeshStandardMaterial({ color, flatShading: true, roughness: 0.5, metalness: model === 'hoe' ? 0.1 : 0.6 }),
+    );
+    mesh.position.set(0, -0.28, 0.06);
+    mesh.rotation.x = model === 'hoe' ? 0.5 : 0.35;
+    mesh.castShadow = true;
+    this.weaponMesh = mesh;
+    this.rig.rightHand.add(mesh);
+  }
+
   get isOverriding(): boolean {
     return this.animOverride !== null;
   }

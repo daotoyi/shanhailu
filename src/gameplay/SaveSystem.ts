@@ -4,7 +4,7 @@ import type { QuestManager } from './QuestManager.js';
 
 const SAVE_PREFIX = 'dashan_save_';
 const SETTINGS_KEY = 'dashan_settings';
-const SAVE_VERSION = 1;
+const SAVE_VERSION = 2;
 export const SAVE_SLOT_COUNT = 3;
 
 export interface PlayerSaveBlob {
@@ -24,6 +24,10 @@ export interface SaveData {
   };
   player: PlayerSaveBlob;
   mapId: string;
+  /** v2:成长与物品(结构宽松:反序列化侧各自校验) */
+  bag?: { slots: ( { itemId: string; count: number; enhance?: number } | null)[]; coins: number };
+  equip?: { slots: Record<string, { itemId: string; enhance: number } | null>; alchemyLevel: number; alchemyExp: number };
+  prog?: { level: number; exp: number; realmIndex: number };
 }
 
 export interface SaveMeta {
@@ -35,7 +39,13 @@ export interface SaveMeta {
 
 function migrate(raw: unknown): SaveData {
   const d = raw as SaveData;
-  // 版本迁移链:当前仅 v1;未来在此 switch 逐级升级
+  // 迁移链:v1(纯剧情档)→ v2(补成长/物品空壳)
+  if (d.version === 1) {
+    d.version = 2;
+    d.bag = { slots: Array(24).fill(null), coins: 0 };
+    d.equip = { slots: {}, alchemyLevel: 0, alchemyExp: 0 };
+    d.prog = { level: 1, exp: 0, realmIndex: 0 };
+  }
   if (d.version === SAVE_VERSION) return d;
   throw new Error(`[Save] 未知存档版本 ${d.version}`);
 }
@@ -50,7 +60,7 @@ export class SaveSystem {
     private readonly quests: QuestManager,
   ) {}
 
-  save(slot: number, player: PlayerSaveBlob, mapId: string): void {
+  save(slot: number, player: PlayerSaveBlob, mapId: string, extra?: Partial<Pick<SaveData, 'bag' | 'equip' | 'prog'>>): void {
     const data: SaveData = {
       version: SAVE_VERSION,
       savedAt: Date.now(),
@@ -60,6 +70,7 @@ export class SaveSystem {
       quests: this.quests.serialize(),
       player,
       mapId,
+      ...extra,
     };
     pal().storage.set(`${SAVE_PREFIX}${slot}`, JSON.stringify(data));
     this.state.markDirty();

@@ -27,9 +27,8 @@ export class CombatSystem {
   private readonly telegraph: TelegraphRing;
   playerDead = false;
   private deadT = 0;
-  /** 贝币(M5 迁移至背包) */
-  coins = 0;
-  herbsCollected = 0;
+  /** 拾取回调(main 接背包) */
+  onPickup: ((kind: 'coin' | 'herb', amount: number) => void) | null = null;
   elapsedRef = 0;
   /** main 注入当前相机 yaw(翻滚方向) */
   lastYaw = 0;
@@ -183,11 +182,10 @@ export class CombatSystem {
     this.telegraph.update(sdt);
     const picked = this.drops.update(dt, playerPos, elapsed);
     for (const item of picked) {
-      if (item.kind === 'coin') this.coins += item.amount;
-      else this.herbsCollected += item.amount;
+      this.onPickup?.(item.kind, item.amount);
       this.hitfx.floatDamage(
         _dp.set(playerPos.x, playerPos.y + 1.9, playerPos.z),
-        item.kind === 'coin' ? item.amount : item.amount,
+        item.amount,
         { heal: true },
       );
     }

@@ -18,6 +18,9 @@ export interface AppEventMap {
   'quest:completed': { id: string; name: string; rewards: { exp?: number; coins?: number; flags?: Record<string, boolean | number> } };
   'quest:kill': { monsterId: string };
   'world:respawn': Record<string, never>;
+  'prog:levelup': { level: number };
+  'prog:breakthrough': { realm: string; unlocks: string[] };
+  'prog:exp': { exp: number; level: number };
 }
 
 type Handler<K extends keyof AppEventMap> = (payload: AppEventMap[K]) => void;
