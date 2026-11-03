@@ -4,8 +4,7 @@ import { createCharacterRig } from './CharacterRig.js';
 import type { InputManager } from '../core/Input/InputManager.js';
 import { PALETTES, DEFAULT_PALETTE_ID } from '../data/character-palettes.js';
 
-/** 玩家运动参数(数据内联,M5 数值化后迁入 data) */
-const MOVE_SPEED = 5.6;
+/** 玩家运动参数(速度可被骑乘加成) */
 const TURN_SPEED = 12;
 
 /**
@@ -17,6 +16,8 @@ export class Player {
   readonly position = new THREE.Vector3();
   /** 面朝向(弧度) */
   heading = 0;
+  /** 基础移速(骑乘时由外部加成) */
+  speed = 5.6;
   /** 当前移动速度(标量,动画混合用) */
   private speedNorm = 0;
   private animOverride: RigAnimState | null = null;
@@ -97,8 +98,8 @@ export class Player {
       const dirX = mv.x * cos - mv.z * sin;
       const dirZ = -mv.x * sin - mv.z * cos;
       const len = Math.max(1, Math.hypot(dirX, dirZ));
-      const vx = (dirX / len) * MOVE_SPEED * Math.min(1, mag);
-      const vz = (dirZ / len) * MOVE_SPEED * Math.min(1, mag);
+      const vx = (dirX / len) * this.speed * Math.min(1, mag);
+      const vz = (dirZ / len) * this.speed * Math.min(1, mag);
       this.position.x += vx * dt;
       this.position.z += vz * dt;
       // 平滑转向(最短路径)

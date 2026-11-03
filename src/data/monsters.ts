@@ -20,10 +20,12 @@ export interface MonsterDef {
   /** 阶段血量阈值(如 [0.5] = 50% 切第二池) */
   phaseThresholds?: number[];
   /** 外观 */
-  body: 'ghost' | 'ape' | 'boss_ghost';
+  body: 'ghost' | 'ape' | 'boss_ghost' | 'fox9' | 'lushu' | 'bifang';
   scale?: number;
   /** Boss */
   isBoss?: boolean;
+  /** 可契约(缚灵索捕捉) */
+  catchable?: boolean;
 }
 
 export const MONSTERS: Record<string, MonsterDef> = {
@@ -93,5 +95,64 @@ export const MONSTERS: Record<string, MonsterDef> = {
     body: 'boss_ghost',
     scale: 1.6,
     isBoss: true,
+  },
+
+  /* ---- 可契约异兽(M6:削弱→缚灵索捕捉) ---- */
+  beast_fox: {
+    id: 'beast_fox',
+    name: '九尾狐',
+    element: 'wood',
+    hp: 130,
+    atk: 11,
+    def: 3,
+    exp: 70,
+    coins: [10, 24],
+    speed: 3.4,
+    aggroDist: 8,
+    attackDist: 2.0,
+    attackCd: 2.4,
+    attacks: [[
+      { name: '狐火', multiplier: 1.0, windup: 0.5, hitAt: 0.6, shape: 'projectile', speed: 9, life: 1.6, color: '#f2a0c0' },
+    ]],
+    body: 'fox9',
+    catchable: true,
+  },
+  beast_lushu: {
+    id: 'beast_lushu',
+    name: '鹿蜀',
+    element: 'wood',
+    hp: 160,
+    atk: 8,
+    def: 4,
+    exp: 60,
+    coins: [8, 18],
+    speed: 3.8,
+    aggroDist: 6,
+    attackDist: 2.2,
+    attackCd: 3.0,
+    attacks: [[
+      { name: '后蹄踢', multiplier: 0.9, windup: 0.55, hitAt: 0.65, shape: 'cone', range: 2.3, arcDeg: 120, color: '#c8a878' },
+    ]],
+    body: 'lushu',
+    catchable: true,
+  },
+  beast_bifang: {
+    id: 'beast_bifang',
+    name: '毕方',
+    element: 'fire',
+    hp: 110,
+    atk: 14,
+    def: 2,
+    exp: 80,
+    coins: [12, 26],
+    speed: 3.0,
+    aggroDist: 10,
+    attackDist: 2.6,
+    attackCd: 2.2,
+    attacks: [[
+      { name: '讹火', multiplier: 1.15, windup: 0.6, hitAt: 0.7, shape: 'projectile', speed: 10, life: 1.5, color: '#ff9a4a' },
+    ]],
+    body: 'bifang',
+    catchable: true,
   },
 };

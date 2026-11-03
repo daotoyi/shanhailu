@@ -80,6 +80,8 @@ export const ITEMS: Record<string, ItemDef> = {
   /* ---- 材料 ---- */
   mat_ghost_marrows: it({ id: 'mat_ghost_marrows', name: '鬼髓', type: 'material', quality: 1, stack: 20, sell: 8, desc: '疫鬼残躯凝出的阴冷髓质。' }),
   mat_ape_fang: it({ id: 'mat_ape_fang', name: '山魈獠', type: 'material', quality: 0, stack: 20, sell: 6, desc: '坚硬如铁,可入兵刃。' }),
+  item_fulingsuo: it({ id: 'item_fulingsuo', name: '缚灵索', type: 'material', quality: 2, stack: 10, sell: 18, buy: 45, desc: '巫祝秘制绳索,可缚虚弱异兽之灵(对其使用)。' }),
+  pill_beast_food: it({ id: 'pill_beast_food', name: '兽饵', type: 'material', quality: 0, stack: 20, sell: 4, buy: 10, desc: '喂食神兽可增进修为(升阶素材)。' }),
   /* ---- 丹药 ---- */
   pill_huixue: it({ id: 'pill_huixue', name: '回血丹', type: 'pill', quality: 0, stack: 10, sell: 6, buy: 12, effects: { healHp: 55 }, desc: '服之气血翻涌,回复 55 生命。' }),
   pill_ningshen: it({ id: 'pill_ningshen', name: '凝神丹', type: 'pill', quality: 0, stack: 10, sell: 6, buy: 12, effects: { healMp: 40 }, desc: '清心凝神,回复 40 灵力。' },

@@ -22,6 +22,8 @@ import { Inventory } from './gameplay/Inventory.js';
 import { Equipment } from './gameplay/Equipment.js';
 import { Progression } from './gameplay/Progression.js';
 import { Alchemy } from './gameplay/Alchemy.js';
+import { BeastSystem } from './gameplay/BeastSystem.js';
+import { BEASTS, CATCH_ITEM } from './data/bestiary.js';
 import { ITEMS, type ItemDef } from './data/items.js';
 import { MONSTERS } from './data/monsters.js';
 import { DROP_TABLE } from './data/progression.js';
@@ -143,7 +145,45 @@ async function boot(): Promise<void> {
   const combat = new CombatSystem(world, input, bus, followCam, camera, ui);
   const hud = new PlayerHUD(ui);
   hud.show();
-  bus.on('quest:kill', ({ monsterId }) => quests.progress('kill', monsterId));
+
+  /* ---- 神兽系统(M6) ---- */
+  const beasts = new BeastSystem(world.scene, bus);
+  bus.on('quest:kill', ({ monsterId }) => {
+    const beast = BEASTS.find((b) => b.monsterId === monsterId);
+    if (beast) beasts.recordKill(beast.id);
+  });
+  bus.on('beast:caught', ({ name }) => {
+    tracker.showBanner(`契约成立 · ${name}`, 2600);
+    beasts.setActive(beasts.contracted.length - 1);
+    panels.markDirty();
+  });
+  const combatHitFeedback = (e: Parameters<typeof combat.damageEnemy>[0], amount: number, crit: boolean, em: number) => {
+    combat.damageEnemy(e, amount, crit, em);
+    combat.hitfx.floatDamage(new THREE.Vector3(e.position.x, e.position.y + 1.2, e.position.z), amount, { crit, elementMul: em });
+    combat.hitfx.hitstop(crit ? 0.08 : 0.045);
+    combat.hitfx.shake(crit ? 0.4 : 0.2);
+  };
+  bus.on('input:action', ({ action, phase }) => {
+    if (action === 'toggleRide' && phase === 'start') {
+      const target = !beasts.riding;
+      if (beasts.setRiding(target)) {
+        world.player.speed = 5.6 + beasts.rideSpeedBonus;
+        tracker.showBanner(target ? '翻身上马 · 鹿蜀嘶鸣' : '下马休整', 1800);
+      } else if (target) {
+        tracker.showBanner('需要出战一头可骑乘的神兽(鹿蜀)', 2200);
+      }
+    }
+  });
+  // 野外异兽(每图刷新;削弱后可契约)
+  const spawnWildBeasts = (): void => {
+    const mapId = world.maps.def.id;
+    if (mapId === 'yaowang-valley') {
+      combat.spawnMonster('beast_lushu', 26, 22);
+      combat.spawnMonster('beast_fox', -28, 4);
+    } else if (mapId === 'dahuang-city') {
+      combat.spawnMonster('beast_bifang', -34, -34);
+    }
+  };
   bus.on('world:respawn', () => {
     tracker.showBanner('香火护佑 · 神祠前醒来', 2000);
     followCam.snapTo(world.player.position);
@@ -202,7 +242,7 @@ async function boot(): Promise<void> {
     }
     panels.markDirty();
   };
-  const panels = new GamePanels(inventory, equipment, progression, alchemy, bus, ui, {
+  const panels = new GamePanels(inventory, equipment, progression, alchemy, beasts, bus, ui, {
     onUseItem: (bagIndex) => {
       const def: ItemDef | null = inventory.consume(bagIndex);
       if (!def?.effects) return;
@@ -271,16 +311,22 @@ async function boot(): Promise<void> {
     directorRef?.markChapterDirty();
     directorRef?.refreshEntities();
     directorRef?.bindInteractables();
+    beastSystemDeserialize(data);
     progression.recompute();
     syncStats();
     panels.markDirty();
     tracker.refresh();
   };
 
+  const beastSystemDeserialize = (data: NonNullable<ReturnType<SaveSystem['load']>>): void => {
+    beasts.deserialize(data.bestiary ?? {});
+  };
+
   const saveBlobExtra = () => ({
     bag: inventory.serialize(),
     equip: equipment.serialize(),
     prog: progression.serialize(),
+    bestiary: beasts.serialize(),
   });
 
   const afterMapSwitch = (pos: THREE.Vector3): void => {
@@ -289,6 +335,7 @@ async function boot(): Promise<void> {
     directorRef?.markChapterDirty();
     directorRef?.refreshEntities();
     directorRef?.bindInteractables();
+    spawnWildBeasts();
   };
 
   const teleportTo = (mapId: string, spawnId?: string): void => {
@@ -339,6 +386,7 @@ async function boot(): Promise<void> {
   director.cameraRef = camera;
   director.bindInteractables();
   director.refreshEntities();
+  spawnWildBeasts();
 
   bus.on('quest:completed', ({ id }) => {
     tracker.showBanner(`任务完成`, 2000);
@@ -392,6 +440,38 @@ async function boot(): Promise<void> {
     world.update(dt, elapsed, followCam.currentYaw, dialogFrozen || combatLock);
 
     director.update(dt, elapsed, interactPressed && !dialogFrozen);
+
+    // 神兽:协战 + 捕捉交互(优先于 NPC 提示)
+    beasts.update(dt, elapsed, world.player.position, world.player.heading, combat.enemies, {
+      damageEnemy: (e, amount, crit, em) => combatHitFeedback(e, amount, crit, em),
+      floatHeal: (amount) => {
+        combat.stats.heal(amount);
+        combat.hitfx.floatDamage(
+          new THREE.Vector3(world.player.position.x, world.player.position.y + 1.8, world.player.position.z),
+          amount,
+          { heal: true },
+        );
+      },
+      playerAtk: combat.stats.block.atk,
+      playerElement: combat.stats.block.element,
+    });
+    if (!dialogFrozen) {
+      const near = beasts.catchableNearby(combat.enemies, world.player.position);
+      if (near) {
+        prompt.show(`对 ${near.def.name} 使用缚灵索`);
+        if (interactPressed) {
+          if (inventory.countOf(CATCH_ITEM) > 0) {
+            inventory.remove(CATCH_ITEM, 1);
+            const res = beasts.tryCatch(near.enemy, 0.15); // 巫祝亲和 +15%
+            tracker.showBanner(res.msg, 2400);
+            panels.markDirty();
+          } else {
+            tracker.showBanner('没有缚灵索了(百草集有售)', 2200);
+          }
+        }
+      }
+    }
+
     postfx.render(dt);
     tween.update(dt);
     minimap.update(dt, world.player.position, world.player.heading, elapsed);
@@ -437,6 +517,7 @@ async function boot(): Promise<void> {
       progression,
       alchemy,
       panels,
+      beasts,
       switchMap: (m: string, s: string) => world.switchMap(m, s),
     };
     console.info(

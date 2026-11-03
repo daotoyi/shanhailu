@@ -21,6 +21,9 @@ export interface AppEventMap {
   'prog:levelup': { level: number };
   'prog:breakthrough': { realm: string; unlocks: string[] };
   'prog:exp': { exp: number; level: number };
+  'beast:caught': { beastId: string; name: string };
+  'beast:fed': { beastId: string; stage: number };
+  'beast:ride': { riding: boolean };
 }
 
 type Handler<K extends keyof AppEventMap> = (payload: AppEventMap[K]) => void;

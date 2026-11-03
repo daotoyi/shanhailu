@@ -4,6 +4,8 @@ import type { MonsterDef } from '../data/monsters.js';
 import type { MonsterAttack } from '../data/skills.js';
 import type { ProjectileSystem } from '../combat/Projectile.js';
 import type { TelegraphRing } from '../combat/Telegraph.js';
+import { BEASTS } from '../data/bestiary.js';
+import { buildBeastBody } from '../world/BeastBodies.js';
 
 export type EnemyState = 'idle' | 'alert' | 'chase' | 'attack' | 'return' | 'dead';
 
@@ -17,8 +19,16 @@ export interface EnemyHitContext {
   spawnProjectile: (opts: { from: THREE.Vector3; dir: THREE.Vector3; attack: MonsterAttack; damage: number }) => void;
 }
 
-/** 简易身体(鬼/猿/Boss 三型;异兽拼装外观 M6/M7 替换) */
+/** 简易身体(鬼/猿/Boss/异兽拼装) */
 function buildBody(def: MonsterDef): { group: THREE.Group; core: THREE.Mesh } {
+  // 异兽:走拼装外观库
+  if (def.body === 'fox9' || def.body === 'lushu' || def.body === 'bifang') {
+    const beastDef = BEASTS.find((b) => b.monsterId === def.id);
+    if (beastDef) {
+      const body = buildBeastBody(beastDef);
+      return { group: body.group, core: body.group.children[0] as THREE.Mesh };
+    }
+  }
   const g = new THREE.Group();
   if (def.body === 'ghost' || def.body === 'boss_ghost') {
     const color = def.body === 'boss_ghost' ? '#4a3560' : '#3a3350';

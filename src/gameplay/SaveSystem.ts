@@ -28,6 +28,7 @@ export interface SaveData {
   bag?: { slots: ( { itemId: string; count: number; enhance?: number } | null)[]; coins: number };
   equip?: { slots: Record<string, { itemId: string; enhance: number } | null>; alchemyLevel: number; alchemyExp: number };
   prog?: { level: number; exp: number; realmIndex: number };
+  bestiary?: { records: Record<string, { kills: number; caught: boolean }>; contracted: { beastId: string; stage: number; exp: number }[]; activeIndex: number };
 }
 
 export interface SaveMeta {

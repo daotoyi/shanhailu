@@ -1,13 +1,15 @@
 import { ITEMS, QUALITY_COLOR, QUALITY_LABEL, EQUIP_SLOT_LABEL, type EquipSlot } from '../data/items.js';
 import { RECIPES } from '../data/recipes.js';
 import { CITY_SHOP } from '../data/progression.js';
+import { BEASTS } from '../data/bestiary.js';
 import type { Inventory } from '../gameplay/Inventory.js';
 import type { Equipment } from '../gameplay/Equipment.js';
 import type { Progression } from '../gameplay/Progression.js';
 import type { Alchemy } from '../gameplay/Alchemy.js';
+import type { BeastSystem } from '../gameplay/BeastSystem.js';
 import type { EventBus } from '../core/events.js';
 
-export type PanelTab = 'bag' | 'equip' | 'alchemy' | 'shop';
+export type PanelTab = 'bag' | 'equip' | 'alchemy' | 'shop' | 'bestiary';
 
 /**
  * 游戏主面板(国风卷轴,四页签):背包/装备/炼药/商店(PROMPT §3.8/3.10/3.11)。
@@ -28,6 +30,7 @@ export class GamePanels {
     private readonly equipment: Equipment,
     private readonly progression: Progression,
     private readonly alchemy: Alchemy,
+    private readonly beasts: BeastSystem,
     bus: EventBus,
     stage: { append(...nodes: HTMLElement[]): void },
     private readonly hooks: {
@@ -50,7 +53,7 @@ export class GamePanels {
 
     this.tabsBar = document.createElement('div');
     this.tabsBar.style.cssText = 'display:flex;gap:6px;padding:12px 18px 0;';
-    for (const [key, label] of [['bag', '背包'], ['equip', '装备'], ['alchemy', '炼药'], ['shop', '商店']] as const) {
+    for (const [key, label] of [['bag', '背包'], ['equip', '装备'], ['alchemy', '炼药'], ['shop', '商店'], ['bestiary', '图鉴']] as const) {
       const b = document.createElement('button');
       b.className = 'dsh-btn';
       b.style.cssText = 'font-size:13px;padding:6px 18px;letter-spacing:3px;';
@@ -132,6 +135,7 @@ export class GamePanels {
     if (this.tab === 'bag') this.renderBag();
     else if (this.tab === 'equip') this.renderEquip();
     else if (this.tab === 'alchemy') this.renderAlchemy();
+    else if (this.tab === 'bestiary') this.renderBestiary();
     else this.renderShop();
   }
 
@@ -282,6 +286,57 @@ export class GamePanels {
       }, true);
       btn.disabled = !this.alchemy.canBrew(r);
       row.append(mid, btn);
+      list.append(row);
+    }
+    this.body.append(head, list);
+  }
+
+  /** 山海经异兽图鉴(PROMPT §3.12):击杀/契约进度 + 原文引句 */
+  private renderBestiary(): void {
+    const head = document.createElement('div');
+    head.className = 'dsh-label';
+    head.style.cssText = 'font-size:13px;margin-bottom:10px;';
+    head.innerHTML = `山海经 · 异兽图鉴 <span class="dsh-label dim" style="font-size:11px;">(击杀或契约后解锁条目)</span>`;
+    const list = document.createElement('div');
+    list.style.cssText = 'display:flex;flex-direction:column;gap:8px;';
+    for (const b of BEASTS) {
+      const rec = this.beasts.records[b.id];
+      const row = document.createElement('div');
+      row.style.cssText = 'padding:10px 14px;border:1px solid rgba(201,162,92,0.3);border-radius:3px;background:rgba(23,19,14,0.45);';
+      if (!rec || (rec.kills === 0 && !rec.caught)) {
+        row.innerHTML = `<div style="font-size:14px;color:rgba(232,226,211,0.35);letter-spacing:3px;">??? · ${'未 睹 其 形'}</div>`;
+      } else {
+        const status = rec.caught ? '<span style="color:#ffd45e;">已契约</span>' : `击杀 ×${rec.kills}`;
+        row.innerHTML =
+          `<div style="font-size:15px;color:#c9a25c;letter-spacing:2px;">${b.name} <span style="font-size:11px;opacity:0.7;">${b.quoteSrc} · ${status}</span></div>` +
+          `<div style="font-size:12px;color:#e8e2d3;opacity:0.85;margin-top:4px;line-height:1.6;">「${b.quote}」</div>` +
+          `<div style="font-size:11px;color:rgba(232,226,211,0.55);margin-top:4px;">${b.lore}</div>`;
+        if (rec.caught) {
+          const c = this.beasts.contracted.find((x) => x.beastId === b.id);
+          if (c) {
+            const act = this.actionBtn(this.beasts.contracted[this.beasts.activeIndex] === c ? '休息' : '出战', () => {
+              const idx = this.beasts.contracted.findIndex((x) => x.beastId === b.id);
+              this.beasts.setActive(this.beasts.activeIndex === idx ? -1 : idx);
+              this.dirty = true;
+            }, true);
+            const feed = this.actionBtn('喂养×5', () => {
+              this.beasts.feed(b.id, 5);
+              this.dirty = true;
+            });
+            const ride = this.actionBtn('骑乘', () => {
+              const idx = this.beasts.contracted.findIndex((x) => x.beastId === b.id);
+              this.beasts.setActive(idx);
+              this.beasts.setRiding(true);
+              this.dirty = true;
+            });
+            if (b.rideSpeed === 0) ride.disabled = true;
+            const stage = document.createElement('span');
+            stage.style.cssText = 'font-size:11px;color:#5fd2a0;margin-right:8px;';
+            stage.textContent = `阶 ${c.stage}`;
+            row.append(document.createElement('br'), stage, act, feed, ride);
+          }
+        }
+      }
       list.append(row);
     }
     this.body.append(head, list);

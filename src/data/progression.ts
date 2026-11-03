@@ -52,6 +52,8 @@ export const CITY_SHOP: ShopShelf = {
     { itemId: 'ar_belt_rope', price: 16 },
     { itemId: 'tr_jade_ring', price: 80 },
     { itemId: 'ar_cloth', price: 14 },
+    { itemId: 'item_fulingsuo', price: 45 },
+    { itemId: 'pill_beast_food', price: 10 },
   ],
 };
 

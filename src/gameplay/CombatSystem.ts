@@ -67,6 +67,11 @@ export class CombatSystem {
     });
   }
 
+  /** 供协战等外部系统结算伤害 */
+  damageEnemy(e: Enemy, amount: number, crit: boolean, em: number): void {
+    e.takeDamage(amount, crit, em);
+  }
+
   spawnMonster(defId: string, x: number, z: number): Enemy {
     const def = MONSTERS[defId]!;
     const e = new Enemy(def, new THREE.Vector3(x, this.world.heightAt(x, z), z), {
