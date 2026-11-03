@@ -42,9 +42,9 @@ export class Player {
     return this.animOverride !== null;
   }
 
-  update(dt: number, elapsed: number, camYaw: number): void {
-    // 输入 → 相机系移动向量
-    const mv = this.input.moveVector();
+  update(dt: number, elapsed: number, camYaw: number, frozen = false): void {
+    // 输入 → 相机系移动向量(对话/过场/菜单时冻结移动,动画回落 idle)
+    const mv = frozen ? { x: 0, z: 0 } : this.input.moveVector();
     const mag = Math.hypot(mv.x, mv.z);
 
     if (mag > 0.05) {

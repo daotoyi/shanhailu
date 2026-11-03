@@ -51,14 +51,17 @@ export class Engine {
       this.bus.emit('engine:resize', { width: w, height: h, dpr });
     });
 
-    this.renderer.setAnimationLoop(() => {
-      const now = pal().platform.now();
-      this.time.update(now);
-      const { dt, elapsed } = this.time;
-      for (const tick of this.ticks) tick(dt, elapsed);
-      this.bus.emit('engine:frame', { dt });
-      for (const cb of this.frameEndCbs) cb();
-    });
+    this.renderer.setAnimationLoop(() => this.frameOnce());
+  }
+
+  /** 单帧推进(rAF 被宿主节流时,自测/自动化可手动驱动) */
+  frameOnce(): void {
+    const now = pal().platform.now();
+    this.time.update(now);
+    const { dt, elapsed } = this.time;
+    for (const tick of this.ticks) tick(dt, elapsed);
+    this.bus.emit('engine:frame', { dt });
+    for (const cb of this.frameEndCbs) cb();
   }
 
   stop(): void {

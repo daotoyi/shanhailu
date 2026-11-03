@@ -52,15 +52,15 @@ export class World {
     return this.player.position.clone();
   }
 
-  update(dt: number, elapsed: number, camYaw: number): void {
+  update(dt: number, elapsed: number, camYaw: number, frozenPlayer = false): void {
     // 玩家移动(内部处理输入)
-    this.player.update(dt, elapsed, camYaw);
+    this.player.update(dt, elapsed, camYaw, frozenPlayer);
     // 碰撞推离 + 地图边界
     this.resolveCollisions();
     // 地图内容动画
     this.maps.map.update(elapsed);
-    // 传送检测
-    this.checkTeleporters();
+    // 传送检测(冻结时不触发)
+    if (!frozenPlayer) this.checkTeleporters();
   }
 
   private resolveCollisions(): void {

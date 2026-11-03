@@ -11,6 +11,11 @@ export interface AppEventMap {
   'quality:changed': { level: string };
   'world:teleport': { mapId: string; spawnId: string; label: string };
   'world:boundary': Record<string, never>;
+  'story:chapter': { chapter: string };
+  'quest:accepted': { id: string; name: string };
+  'quest:changed': { id: string };
+  'quest:progress': { id: string; stepIndex: number; done: boolean };
+  'quest:completed': { id: string; name: string; rewards: { exp?: number; coins?: number; flags?: Record<string, boolean | number> } };
 }
 
 type Handler<K extends keyof AppEventMap> = (payload: AppEventMap[K]) => void;
