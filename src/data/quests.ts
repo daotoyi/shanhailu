@@ -42,13 +42,26 @@ export const QUESTS: Record<string, QuestDef> = {
     ],
     rewards: { exp: 20, coins: 10, flags: { 'story.met_master': true } },
   },
+  q_prologue_battle: {
+    id: 'q_prologue_battle',
+    name: '谷乱·疫鬼',
+    type: 'main',
+    chapter: 'prologue',
+    summary: '毒雾自池塘边涌起——疫鬼闯入了药王谷,瘴母在其后徘徊。',
+    prereq: ['q_prologue_1'],
+    steps: [
+      { desc: '击退疫鬼', type: 'kill', target: 'yigui', count: 2 },
+      { desc: '击败疫鬼·瘴母', type: 'kill', target: 'yigui_boss', count: 1 },
+    ],
+    rewards: { exp: 50, coins: 25, flags: { 'story.cleared_yigui': true } },
+  },
   q_prologue_2: {
     id: 'q_prologue_2',
     name: '噩耗·神农中毒',
     type: 'main',
     chapter: 'prologue',
     summary: '共主神农氏身中旷世奇毒的消息,随着驿马传进了山谷。',
-    prereq: ['q_prologue_1'],
+    prereq: ['q_prologue_battle'],
     steps: [
       { desc: '回药庐向师父询问变故', type: 'talk', target: 'dlg_npc_master_2' },
       { desc: '在谷口驿亭听驿卒说详', type: 'talk', target: 'dlg_npc_courier' },

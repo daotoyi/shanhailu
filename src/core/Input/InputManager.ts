@@ -15,6 +15,7 @@ export class InputManager {
   private lookY = 0;
   private zoom = 0;
   private rmbDown = false;
+  private leftDown = false;
   private unsubs: (() => void)[] = [];
   /** 触屏虚拟摇杆向量(x 右 / z 前,归一化) */
   private virtualMoveX = 0;
@@ -62,6 +63,19 @@ export class InputManager {
         if (e.pointerType === 'mouse') {
           if (e.type === 'down' && e.button === 2) this.rmbDown = true;
           if (e.type === 'up' && e.button === 2) this.rmbDown = false;
+          // 左键 = 普攻(§4.6 桌面端扩展键位)
+          if (e.type === 'down' && e.button === 0 && !this.leftDown) {
+            this.leftDown = true;
+            if (!this.down.has('attack')) this.pressed.add('attack');
+            this.down.add('attack');
+            this.bus.emit('input:action', { action: 'attack', phase: 'start' });
+          }
+          if (e.type === 'up' && e.button === 0 && this.leftDown) {
+            this.leftDown = false;
+            this.down.delete('attack');
+            this.released.add('attack');
+            this.bus.emit('input:action', { action: 'attack', phase: 'end' });
+          }
         }
         // 指针锁定时始终累积视角;未锁定时按住右键拖拽
         const locked = pal().input.isPointerLocked;

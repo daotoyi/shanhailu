@@ -38,6 +38,16 @@ export class Player {
     this.overrideT = duration;
   }
 
+  /** 翻滚冲量(CombatSystem 触发;世界方向) */
+  private dodgeImpulse = new THREE.Vector3();
+  private dodgeT = 0;
+
+  setDodgeImpulse(dir: THREE.Vector3): void {
+    this.dodgeImpulse.copy(dir).normalize().multiplyScalar(9.2);
+    this.dodgeT = 0.36;
+    this.playOverride('dodge', 0.42);
+  }
+
   get isOverriding(): boolean {
     return this.animOverride !== null;
   }
@@ -67,6 +77,21 @@ export class Player {
       this.speedNorm += (Math.min(1, mag) - this.speedNorm) * Math.min(1, dt * 10);
     } else {
       this.speedNorm += (0 - this.speedNorm) * Math.min(1, dt * 12);
+    }
+
+    // 翻滚冲量(优先于走动,衰减推进)
+    if (this.dodgeT > 0) {
+      this.dodgeT -= dt;
+      const step = Math.min(this.dodgeT / 0.36, 1) * 0.65 + 0.35;
+      this.position.x += this.dodgeImpulse.x * dt * step;
+      this.position.z += this.dodgeImpulse.z * dt * step;
+      if (this.dodgeImpulse.lengthSq() > 0.01) {
+        const h = Math.atan2(this.dodgeImpulse.x, this.dodgeImpulse.z);
+        let d2 = h - this.heading;
+        while (d2 > Math.PI) d2 -= Math.PI * 2;
+        while (d2 < -Math.PI) d2 += Math.PI * 2;
+        this.heading += d2 * Math.min(1, dt * 18);
+      }
     }
 
     // 地形贴合

@@ -16,6 +16,8 @@ export interface AppEventMap {
   'quest:changed': { id: string };
   'quest:progress': { id: string; stepIndex: number; done: boolean };
   'quest:completed': { id: string; name: string; rewards: { exp?: number; coins?: number; flags?: Record<string, boolean | number> } };
+  'quest:kill': { monsterId: string };
+  'world:respawn': Record<string, never>;
 }
 
 type Handler<K extends keyof AppEventMap> = (payload: AppEventMap[K]) => void;

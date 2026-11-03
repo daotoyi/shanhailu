@@ -9,6 +9,7 @@ export type InputAction =
   | 'back'
   | 'left'
   | 'right'
+  | 'attack'
   | 'dodge'
   | 'skill1'
   | 'skill2'
@@ -26,6 +27,7 @@ export const DEFAULT_KEY_BINDINGS: Readonly<Record<string, InputAction>> = {
   KeyS: 'back',
   KeyA: 'left',
   KeyD: 'right',
+  KeyJ: 'attack',
   Space: 'dodge',
   Digit1: 'skill1',
   Digit2: 'skill2',

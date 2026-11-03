@@ -68,6 +68,7 @@ export class ScenarioDirector {
       onShrineMenu: () => void;
       onStealthFail: () => void;
       onTeleportRequest: (mapId: string) => void;
+      spawnWave: (kind: 'prologue_battle' | 'clear') => void;
     },
   ) {
     this.cin.bindActions((a) => this.applyAction(a));
@@ -93,7 +94,7 @@ export class ScenarioDirector {
       const master = this.makeNpc('npc_master', '药翁', 'master', 'apprentice', [-14, -14.5], 0.9, heightAt);
       this.npcs.push(master);
       // 驿卒(噩耗后出现在谷口驿亭)
-      if (this.state.getFlag('story.heard_intro') || this.quests.isActive('q_prologue_2')) {
+      if (this.quests.isActive('q_prologue_2')) {
         const courier = this.makeNpc('npc_courier', '驿卒', 'courier', 'courier', [16, -4], -1.2, heightAt);
         this.npcs.push(courier);
       }
@@ -102,6 +103,10 @@ export class ScenarioDirector {
         const herb = new CollectibleHerb(`herb_${idx}`, 'herb_qingjingzhi', hx, hz, heightAt);
         this.herbs.push(herb);
         scene.add(herb.group);
+      }
+      // 教学战斗波:疫鬼×2 + Boss 瘴母(仅药王谷)
+      if (this.quests.isActive('q_prologue_battle') && this.world.maps.def.id === 'yaowang-valley') {
+        this.hooks.spawnWave('prologue_battle');
       }
     } else if (this.state.chapter === 'ch1') {
       // 药翁(夜谈)
@@ -258,11 +263,21 @@ export class ScenarioDirector {
 
   /* ============ 帧更新 ============ */
 
+  private prevDialogOpen = false;
+  private interactCd = 0;
+
   update(dt: number, elapsed: number, interactPressed: boolean): void {
     // 实体刷新(key 对比,无变化时零成本)
     this.refreshEntities();
     // 打字机推进
     this.dialogs.tick(dt);
+    // 对话关闭冷却:防止"关对话的 E"同帧重新触发 NPC 交互
+    const wasOpen = this.prevDialogOpen;
+    const isOpen = this.dialogs.isOpen;
+    if (wasOpen && !isOpen) this.interactCd = 0.3;
+    this.prevDialogOpen = isOpen;
+    this.interactCd = Math.max(0, this.interactCd - dt);
+    const canInteract = interactPressed && this.interactCd <= 0;
     const frozen = this.dialogs.isOpen || this.cin.isPlaying || this.freezePlayer;
 
     if (this.cin.isPlaying) {
@@ -274,12 +289,12 @@ export class ScenarioDirector {
 
     // 触发器/NPC/采集物(冻结时仍更新巡逻动画但不判失败)
     const playerPos = this.world.player.position;
-    const hit = this.triggers.update(dt, elapsed, playerPos, interactPressed && !frozen, this.world.scene);
+    const hit = this.triggers.update(dt, elapsed, playerPos, canInteract && !frozen, this.world.scene);
     for (const n of this.npcs) n.update(elapsed);
     for (const h of this.herbs) {
       h.update(elapsed);
       // 靠近采集(E)
-      if (!h.picked && interactPressed && !frozen && playerPos.distanceTo(h.pos) < 1.6) {
+      if (!h.picked && canInteract && !frozen && playerPos.distanceTo(h.pos) < 1.6) {
         h.pick();
         this.quests.progress('collect', h.herbId);
         this.tracker.showBanner('采得 青茎芝 ×1', 1600);
@@ -289,7 +304,7 @@ export class ScenarioDirector {
     // 交互提示
     if (!frozen && hit && !this.dialogs.isOpen) {
       this.prompt.show(hit.prompt);
-      if (interactPressed) {
+      if (canInteract) {
         hit.onInteract();
       }
     } else if (!frozen) {
@@ -301,7 +316,7 @@ export class ScenarioDirector {
       }
       if (best) {
         this.prompt.show(`与 ${this.npcs.find((n) => n.id === best.npcId)?.name ?? '旅人'} 交谈`);
-        if (interactPressed) {
+        if (canInteract) {
           const dlg = this.pickDialog(best.npcId);
           if (dlg) {
             this.quests.progress('talk', dlg);
@@ -326,7 +341,12 @@ export class ScenarioDirector {
   /** 监听任务完成,推进章节(由 main 桥接 quest:completed) */
   onQuestCompleted(id: string): void {
     if (id === 'q_prologue_1') {
-      // 晨课完 → 噩耗
+      // 晨课完 → 教学战斗(疫鬼)
+      this.quests.accept('q_prologue_battle');
+      this.markChapterDirty();
+      this.tracker.showBanner('毒雾袭谷 · 疫鬼出没!', 2400);
+    } else if (id === 'q_prologue_battle') {
+      this.hooks.spawnWave('clear');
       this.quests.accept('q_prologue_2');
       this.markChapterDirty();
       this.tracker.showBanner('主线推进 · 噩耗传来', 2200);

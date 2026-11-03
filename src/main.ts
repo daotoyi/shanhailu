@@ -17,6 +17,7 @@ import { QuestManager } from './gameplay/QuestManager.js';
 import { SaveSystem } from './gameplay/SaveSystem.js';
 import { DialogRunner } from './gameplay/DialogRunner.js';
 import { ScenarioDirector } from './gameplay/ScenarioDirector.js';
+import { CombatSystem } from './gameplay/CombatSystem.js';
 import { CinematicPlayer } from './render/Cinematic.js';
 import { ensureGameFonts, type FontSource } from './ui/FontManager.js';
 import { F3Panel } from './ui/F3Panel.js';
@@ -30,6 +31,7 @@ import { DialogUIDom } from './ui/DialogUI.js';
 import { InteractPrompt } from './ui/InteractPrompt.js';
 import { QuestTracker } from './ui/QuestTracker.js';
 import { SaveMenuUI } from './ui/SaveMenuUI.js';
+import { PlayerHUD } from './ui/PlayerHUD.js';
 import { DebugCamera } from './world/DebugCamera.js';
 
 const FONT_SOURCE_LABEL: Record<FontSource, string> = {
@@ -118,6 +120,17 @@ async function boot(): Promise<void> {
   });
   followCam.snapTo(world.player.position);
 
+  /* ---- 战斗系统 ---- */
+  const combat = new CombatSystem(world, input, bus, followCam, camera, ui);
+  const hud = new PlayerHUD(ui);
+  hud.show();
+  bus.on('quest:kill', ({ monsterId }) => quests.progress('kill', monsterId));
+  bus.on('world:respawn', () => {
+    tracker.showBanner('香火护佑 · 神祠前醒来', 2000);
+    followCam.snapTo(world.player.position);
+  });
+  combat.onPlayerDown = () => tracker.showBanner('力竭倒下……', 2200);
+
   /* ---- UI 层 ---- */
   const touch = new TouchControls(input, ui);
   void touch;
@@ -194,6 +207,17 @@ async function boot(): Promise<void> {
       tracker.showBanner('行踪败露!退回谷中再试', 2200);
     },
     onTeleportRequest: (mapId) => teleportTo(mapId),
+    spawnWave: (kind) => {
+      if (kind === 'clear') {
+        combat.clearEnemies();
+        return;
+      }
+      combat.clearEnemies();
+      combat.spawnMonster('yigui', -6, -2);
+      combat.spawnMonster('yigui', 10, -4);
+      combat.spawnMonster('yigui_boss', 0, 14);
+      tracker.showBanner('瘴母已现身于池塘之畔', 2400);
+    },
   });
   directorRef = director;
   director.cameraRef = camera;
@@ -238,17 +262,25 @@ async function boot(): Promise<void> {
     engine.renderer.info.reset();
     state.playtimeSec += dt;
     const interactPressed = input.consumePressed('interact');
+    const dialogFrozen = dialogs.isOpen || cin.isPlaying || director.freezePlayer;
 
     if (useDebugCam) debugCam.update(dt);
     else if (!cin.isPlaying) followCam.update(dt, world.player.position);
 
-    const frozen = dialogs.isOpen || cin.isPlaying || director.freezePlayer;
-    world.update(dt, elapsed, followCam.currentYaw, frozen);
-    director.update(dt, elapsed, interactPressed);
+    combat.lastYaw = followCam.currentYaw;
+    combat.update(dt, elapsed, dialogFrozen);
+
+    // 技能前后摇锁定移动
+    const combatLock = combat.executor.busy && combat.executor.activeState !== 'dodge';
+    world.update(dt, elapsed, followCam.currentYaw, dialogFrozen || combatLock);
+
+    director.update(dt, elapsed, interactPressed && !dialogFrozen);
     postfx.render(dt);
     tween.update(dt);
     minimap.update(dt, world.player.position, world.player.heading, elapsed);
     tracker.update(dt);
+    hud.update(dt, combat.stats, combat.executor, combat.bossInfo);
+    combat.hitfx.update(dt, 1280, 720);
     f3.update(dt);
   });
 
@@ -280,6 +312,8 @@ async function boot(): Promise<void> {
       quests,
       director,
       save,
+      combat,
+      hud,
       switchMap: (m: string, s: string) => world.switchMap(m, s),
     };
     console.info(
@@ -291,7 +325,8 @@ async function boot(): Promise<void> {
 boot().catch((err: unknown) => {
   try {
     const loading = new LoadingScreen();
-    loading.showError(err instanceof Error ? err.message : String(err));
+    const msg = err instanceof Error ? `${err.message}\n${(err.stack ?? '').split('\n').slice(1, 4).join('\n')}` : String(err);
+    loading.showError(msg);
   } catch {
     // 加载页骨架缺失时退回 console
   }
