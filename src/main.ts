@@ -64,6 +64,10 @@ async function boot(): Promise<void> {
   const ui = new UIRoot();
   // M9 POC:?ui=canvas 切换 canvas UI 后端(与 DOM 后端同接口)
   const useCanvasUI = new URLSearchParams(location.search).get('ui') === 'canvas';
+  if (useCanvasUI) {
+    // canvas 后端接管加载页:移除 index.html 预置的 DOM 骨架,避免残影
+    document.getElementById('boot-splash')?.remove();
+  }
   const loading = useCanvasUI ? new CanvasLoading(ui) : new LoadingScreen();
   const tween = new TweenEngine();
 

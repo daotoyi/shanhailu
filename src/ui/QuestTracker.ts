@@ -30,7 +30,7 @@ export class QuestTracker {
     this.root.append(this.title, this.step);
 
     this.banner = document.createElement('div');
-    this.banner.className = 'dsh-panel';
+    this.banner.className = 'dsh-panel banner';
     this.banner.style.cssText = [
       'position:absolute', 'left:50%', 'top:96px', 'transform:translateX(-50%)',
       'padding:14px 40px', 'text-align:center', 'display:none', 'z-index:90',
@@ -67,7 +67,7 @@ export class QuestTracker {
     this.banner.style.display = 'block';
     this.banner.style.animation = 'none';
     void this.banner.offsetWidth;
-    this.banner.style.animation = 'dsh-panel-in 0.3s ease both';
+    this.banner.style.animation = 'dsh-banner-in 0.3s ease both';
     this.bannerTimer = durMs / 1000;
   }
 

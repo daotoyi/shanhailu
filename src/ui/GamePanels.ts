@@ -50,7 +50,7 @@ export class GamePanels {
     },
   ) {
     this.root = document.createElement('div');
-    this.root.className = 'dsh-panel';
+    this.root.className = 'dsh-panel centered';
     this.root.style.cssText = [
       'position:absolute', 'left:50%', 'top:50%', 'transform:translate(-50%,-50%)',
       'width:860px', 'height:520px', 'display:none', 'z-index:105', 'pointer-events:auto',
