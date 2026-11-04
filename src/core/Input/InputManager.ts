@@ -35,6 +35,16 @@ export class InputManager {
 
   constructor(private readonly bus: EventBus) {
     this.attach();
+    // 失焦兜底:清空按住状态,防止切窗后卡键/卡视角
+    window.addEventListener('blur', () => {
+      this.down.clear();
+      this.pressed.clear();
+      this.released.clear();
+      this.rmbDown = false;
+      this.leftDown = false;
+      this.virtualMoveX = 0;
+      this.virtualMoveZ = 0;
+    });
   }
 
   private map(code: string): InputAction | undefined {

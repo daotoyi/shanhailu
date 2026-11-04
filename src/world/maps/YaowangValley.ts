@@ -5,6 +5,7 @@ import { Vegetation } from '../Vegetation.js';
 import { Shrine } from '../Shrine.js';
 import { Fireflies } from '../Fireflies.js';
 import { buildHerbHut, buildTeleporterPad, buildHerbGarden, buildLanternPost, bakeMinimap } from '../structures.js';
+import { GrassTufts } from '../GrassTufts.js';
 import type { BuiltMap, BuiltTeleporter, MapCollider, MapDefinition, MapEnvironment } from './types.js';
 
 const ENV: MapEnvironment = {
@@ -109,6 +110,12 @@ class YaowangValleyMap implements BuiltMap {
       slope: this.terrain.slope(x, z),
       tint: Math.hypot(x - 6, z + 25) < 3 ? [201, 162, 92] : undefined,
     }));
+
+    /* 草地簇(画质升级:单 draw call) */
+    const grass = new GrassTufts(900, (x, z) => this.terrain.height(x, z), (x, z) => this.terrain.slope(x, z), 120, [
+      { x: 0, z: -30, r: 7 }, { x: 0, z: -16, r: 4 }, { x: -14, z: -18, r: 5 },
+    ]);
+    this.group.add(grass.mesh);
   }
 
   /** 构件贴地形(整体取中心高度,构件自带台基可容小坡) */

@@ -560,6 +560,8 @@ async function boot(): Promise<void> {
     loading.close();
     engine.start();
     await audio.init(); // BGM/SFX 就绪(失败静音降级)
+    // 首次进入:操作提示(点击画面获取键盘焦点后即可行走)
+    tracker.showBanner('WASD 移动 · 右键拖拽转视角 · E 交互 · J 攻击', 6000);
     // 有自动档 → 自动续玩;否则新档开场运镜
     const auto = save.load(0);
     if (auto) {
