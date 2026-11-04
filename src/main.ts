@@ -561,7 +561,9 @@ async function boot(): Promise<void> {
     engine.start();
     await audio.init(); // BGM/SFX 就绪(失败静音降级)
     // 首次进入:操作提示(点击画面获取键盘焦点后即可行走)
-    tracker.showBanner('WASD 移动 · 右键拖拽转视角 · E 交互 · J 攻击', 6000);
+    tracker.showBanner('先点击一下画面 · WASD/方向键移动 · E 交互 · J 攻击', 7000);
+    // 嵌入式浏览器兜底:点击画布即取得键盘焦点
+    p.platform.getSurface().addEventListener('pointerdown', () => window.focus());
     // 有自动档 → 自动续玩;否则新档开场运镜
     const auto = save.load(0);
     if (auto) {

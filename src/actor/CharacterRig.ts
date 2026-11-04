@@ -87,6 +87,21 @@ export function createCharacterRig(palette: CharacterPalette): CharacterRig {
   jade.rotation.x = Math.PI / 2;
   const jadeKnot = mesh(new THREE.SphereGeometry(0.014, 6, 5), M.gold, 0, 0.0, 0.165);
   body.add(jade, jadeKnot);
+  // 腰间长飘带(前垂两根,随跑动/风摆动 —— 国漫气质)
+  const sashGroup = new THREE.Group();
+  sashGroup.position.set(0, 0.03, 0);
+  body.add(sashGroup);
+  const sashes: THREE.Group[] = [];
+  for (const [sx, sz] of [[-0.16, 0.24], [0.16, 0.24], [0.03, -0.26]] as const) {
+    const g = new THREE.Group();
+    g.position.set(sx, 0, sz);
+    const ribbon = mesh(new THREE.BoxGeometry(0.045, 0.46, 0.012), M.trim, 0, -0.23, 0);
+    g.add(ribbon);
+    const tip = mesh(new THREE.BoxGeometry(0.049, 0.09, 0.013), M.belt, 0, -0.48, 0);
+    g.add(tip);
+    sashGroup.add(g);
+    sashes.push(g);
+  }
   // 下裙(袍摆,随跑动摆动)
   const skirt = mesh(new THREE.CylinderGeometry(0.16, 0.27, 0.52, 12), M.robeDark, 0, -0.24, 0);
   body.add(skirt);
@@ -122,24 +137,47 @@ export function createCharacterRig(palette: CharacterPalette): CharacterRig {
     bang.scale.set(1.05, 0.55, 0.42);
     head.add(bang);
   }
-  // 发髻+簪
-  const bun = mesh(new THREE.SphereGeometry(0.055, 10, 8), M.hair, 0, 0.235, -0.055);
-  const pin = mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.16, 5), M.gold, 0.045, 0.245, -0.03);
-  pin.rotation.z = Math.PI / 2 - 0.35;
-  head.add(bun, pin);
+  // 国漫风:高马尾(发束扎起,垂落飘动)+ 鬓边垂发
+  const hairTie = mesh(new THREE.TorusGeometry(0.038, 0.014, 8, 12), M.gold, 0, 0.21, -0.075);
+  hairTie.rotation.x = Math.PI / 2 - 0.3;
+  const ponytail = new THREE.Group();
+  ponytail.position.set(0, 0.19, -0.09);
+  const tailSegs: THREE.Mesh[] = [];
+  const tailLens = [0.13, 0.115, 0.1, 0.085];
+  let py = 0;
+  for (let i = 0; i < tailLens.length; i++) {
+    const r = 0.062 - i * 0.011;
+    const seg = mesh(new THREE.SphereGeometry(r, 10, 8), M.hair, 0, py - tailLens[i]! / 2, -0.02 - i * 0.012);
+    seg.scale.set(1 - i * 0.1, tailLens[i]! / r, 1 - i * 0.1);
+    ponytail.add(seg);
+    tailSegs.push(seg);
+    py -= tailLens[i]!;
+  }
+  const tailTip = mesh(new THREE.ConeGeometry(0.03, 0.11, 8), M.hair, 0, py - 0.06, -0.055);
+  tailTip.rotation.x = Math.PI;
+  ponytail.add(tailTip);
+  head.add(hairTie, ponytail);
+  // 鬓边垂发(两缕贴颊)
+  for (const s of [-1, 1] as const) {
+    const lock = mesh(new THREE.CylinderGeometry(0.02, 0.012, 0.3, 7), M.hair, s * 0.135, -0.02, 0.06);
+    lock.rotation.z = s * 0.05;
+    head.add(lock);
+  }
   // 眉(两道,纤细)
   for (const s of [-1, 1] as const) {
     const brow = mesh(new THREE.BoxGeometry(0.04, 0.007, 0.01), M.hair, s * 0.052, 0.08, 0.134);
     brow.rotation.z = s * 0.16;
     head.add(brow);
   }
-  // 眼(白+瞳)
+  // 眼(国漫大眼:白+瞳+上睫毛线)
   for (const s of [-1, 1] as const) {
-    const white = mesh(new THREE.SphereGeometry(0.032, 10, 8), M.eyeWhite, s * 0.05, 0.045, 0.128);
-    white.scale.set(1.1, 0.85, 0.62);
-    const iris = mesh(new THREE.SphereGeometry(0.017, 8, 7), M.eyeDark, s * 0.05, 0.043, 0.15);
-    iris.scale.set(1, 1.05, 0.5);
-    head.add(white, iris);
+    const white = mesh(new THREE.SphereGeometry(0.036, 10, 8), M.eyeWhite, s * 0.052, 0.044, 0.124);
+    white.scale.set(1.12, 0.92, 0.6);
+    const iris = mesh(new THREE.SphereGeometry(0.02, 8, 7), M.eyeDark, s * 0.052, 0.041, 0.147);
+    iris.scale.set(1, 1.08, 0.5);
+    const lash = mesh(new THREE.BoxGeometry(0.062, 0.009, 0.01), M.hair, s * 0.052, 0.062, 0.13);
+    lash.rotation.z = s * 0.1;
+    head.add(white, iris, lash);
   }
   // 鼻与口
   const nose = mesh(new THREE.ConeGeometry(0.016, 0.042, 6), M.skin, 0, 0.008, 0.152);
@@ -296,6 +334,14 @@ export function createCharacterRig(palette: CharacterPalette): CharacterRig {
     skirt.rotation.x = runBlend * 0.06;
     head.rotation.x = -bob * 1.5 + (state === 'idle' ? Math.sin(elapsed * 0.75) * 0.022 : 0);
     head.rotation.y = state === 'idle' ? Math.sin(elapsed * 0.45) * 0.14 : 0;
+    // 马尾与飘带:重力下垂 + 跑动后扬 + 风摆
+    const tailSway = Math.sin(elapsed * 2.4) * 0.09;
+    ponytail.rotation.x = 0.12 + runBlend * 0.45 + tailSway * 0.5;
+    ponytail.rotation.z = Math.sin(elapsed * 1.7) * 0.08;
+    sashes.forEach((g, i) => {
+      g.rotation.x = -runBlend * 0.5 + Math.sin(elapsed * 2.1 + i * 1.3) * 0.12;
+      g.rotation.z = Math.sin(elapsed * 1.6 + i * 2.1) * 0.1;
+    });
   };
 
   return {

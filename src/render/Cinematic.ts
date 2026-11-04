@@ -33,32 +33,22 @@ export class CinematicPlayer {
   private kfIndex = 0;
   private kfT = 0;
   private playing = false;
-  private readonly letterbox: { top: HTMLDivElement; bottom: HTMLDivElement; sub: HTMLDivElement };
+  private readonly sub: HTMLDivElement;
   private onDone: (() => void) | null = null;
   private actionHandler: (a: string) => void = () => {};
   private skipRequested = false;
 
   constructor(stage: { append(...nodes: HTMLElement[]): void }) {
-    const mk = (h: number): HTMLDivElement => {
-      const d = document.createElement('div');
-      d.style.cssText = `position:absolute;left:0;right:0;height:${h}px;background:#0a0806;z-index:100;transition:transform 0.6s ease;`;
-      return d;
-    };
-    const top = mk(70);
-    top.style.top = '0';
-    top.style.transform = 'translateY(-100%)';
-    const bottom = mk(70);
-    bottom.style.bottom = '0';
-    bottom.style.transform = 'translateY(100%)';
+    // 电影黑边已按反馈移除:仅保留字幕(带描边可读)
     const sub = document.createElement('div');
     sub.style.cssText = [
-      'position:absolute', 'left:50%', 'bottom:88px', 'transform:translateX(-50%)',
+      'position:absolute', 'left:50%', 'bottom:72px', 'transform:translateX(-50%)',
       'font-size:19px', 'letter-spacing:5px', 'color:#e8e2d3',
-      'text-shadow:0 1px 4px #000', 'white-space:nowrap', 'z-index:101',
+      'text-shadow:0 1px 3px #000, 0 0 12px rgba(0,0,0,0.9)', 'white-space:nowrap', 'z-index:101',
       'opacity:0', 'transition:opacity 0.4s ease',
     ].join(';');
-    this.letterbox = { top, bottom, sub };
-    stage.append(top, bottom, sub);
+    this.sub = sub;
+    stage.append(sub);
   }
 
   get isPlaying(): boolean {
@@ -81,8 +71,6 @@ export class CinematicPlayer {
     this.playing = true;
     this.skipRequested = false;
     this.onDone = onDone;
-    this.letterbox.top.style.transform = 'translateY(0)';
-    this.letterbox.bottom.style.transform = 'translateY(0)';
     // 立即摆到首帧
     const k0 = def.keyframes[0]!;
     camera.position.set(...k0.pos);
@@ -94,7 +82,7 @@ export class CinematicPlayer {
     const def = this.def;
 
     // 字幕
-    const sub = this.letterbox.sub;
+    const sub = this.sub;
     let active: CinematicSubtitle | null = null;
     for (const s of def.subtitles ?? []) {
       if (this.t >= s.at && this.t < s.at + s.dur) {
@@ -140,9 +128,7 @@ export class CinematicPlayer {
 
   private finish(): void {
     this.playing = false;
-    this.letterbox.top.style.transform = 'translateY(-100%)';
-    this.letterbox.bottom.style.transform = 'translateY(100%)';
-    this.letterbox.sub.style.opacity = '0';
+    this.sub.style.opacity = '0';
     const def = this.def;
     this.def = null;
     const cb = this.onDone;

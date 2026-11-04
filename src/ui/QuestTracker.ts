@@ -1,8 +1,19 @@
 import type { QuestManager } from '../gameplay/QuestManager.js';
 import type { EventBus } from '../core/events.js';
 
+/** 每类目标的操作指引(让玩家知道"怎么操作") */
+const STEP_HINTS: Record<string, string> = {
+  collect: '靠近发光的草药,按 E 采集',
+  talk: '走近 NPC,按 E 对话',
+  reach: '朝金色光柱(信标)走过去',
+  kill: '前往目标区域,击败目标怪物',
+  interact: '靠近目标,按 E 交互',
+  escort: '紧随护送对象',
+  timer: '在时限内完成目标',
+};
+
 /**
- * HUD 任务追踪(右上,小地图下方):当前主线步骤 + 进度;任务完成横幅提示。
+ * HUD 任务追踪(右上,小地图下方):当前主线步骤 + 进度 + 操作指引;任务完成横幅提示。
  */
 export class QuestTracker {
   private readonly root: HTMLDivElement;
@@ -26,7 +37,7 @@ export class QuestTracker {
     this.title.style.cssText = 'font-size:14px;letter-spacing:3px;margin-bottom:4px;text-shadow:0 1px 2px #000;';
     this.step = document.createElement('div');
     this.step.className = 'dsh-label';
-    this.step.style.cssText = 'font-size:12px;line-height:1.6;color:#e8e2d3;text-shadow:0 1px 2px #000;';
+    this.step.style.cssText = 'font-size:12px;line-height:1.6;color:#e8e2d3;text-shadow:0 1px 2px #000;white-space:pre-line;';
     this.root.append(this.title, this.step);
 
     this.banner = document.createElement('div');
@@ -56,7 +67,8 @@ export class QuestTracker {
     if (s) {
       const need = s.count ?? 1;
       const have = quest.counts[`${quest.stepIndex}`] ?? 0;
-      this.step.textContent = `▸ ${s.desc}${need > 1 ? `(${have}/${need})` : ''}`;
+      const hint = STEP_HINTS[s.type] ? `\n<span style="opacity:0.75;font-size:11px;">↳ ${STEP_HINTS[s.type]}</span>` : '';
+      this.step.innerHTML = `▸ ${s.desc}${need > 1 ? `(${have}/${need})` : ''}${hint}`;
     } else {
       this.step.textContent = '▸ 即将完成……';
     }
