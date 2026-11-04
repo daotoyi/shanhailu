@@ -76,7 +76,6 @@ export class GamePanels {
 
     this.body = document.createElement('div');
     this.body.style.cssText = 'flex:1;overflow-y:auto;padding:14px 18px;';
-    this.root.style.display = 'flex';
     this.root.style.flexDirection = 'column';
     this.root.append(title, this.coinLabel, this.tabsBar, this.body);
 
