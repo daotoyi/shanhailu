@@ -18,7 +18,7 @@
 | M9 跨平台准备 | f6a5251 | ✅ |
 | 后续 UX/视觉优化(6 次提交) | 2a410f4 … f0404ac | ✅ |
 | 全量审查 A+B / 角色 v4.4 部署推送 | 83e9ac9 / f5a706f | ✅ |
-| 内容轮:序~终章九章剧情 | d1de36d | ✅ |
+| 内容轮:序~终章九章剧情(已部署并推送) | d1de36d / 0f71f82 | ✅ |
 
 > 注:历史曾 rebase,旧文档中的 11 个 hash 均为 rebase 前对象,已按当前 `git log` 刷新;续跑请以 `git log` / HEAD 为准。
 
@@ -151,7 +151,7 @@
 1. 本轮是**主线剧情**内容轮;§2.5 要求的 ≥6 条支线仍为 0 条,§2.6 的 22 只异兽仍只有 3 只,§3.1 创角系统仍缺——这三项是下一轮内容/系统工作,未在本轮伪装完成。
 2. 运镜采用七章主题图通用机位(远景→推近),非逐图调镜;程序化低模角色仍是 primitives 拼装。
 3. headless SwiftShader 下 fps 不具参考价值,未据此更新性能数字;默认画质 draw calls 仍高于红线(见已知问题 8)。
-4. 本轮**未部署、未推送**:本地提交 `d1de36d`,`dist/` 已刷新为 `index-BY0SzZ9e.js`,线上站点与 GitHub `origin/main` 仍停在 `f5a706f`,等用户确认后再走「部署 → 推送」流程。
+4. 本轮已于 2026-11-05 完成「部署 → 推送」:线上站点与 GitHub `origin/main` 均同步至 `0f71f82`。部署产物 `index-BY0SzZ9e.js`(JS 755.28KB / gzip 217.88KB)+ `index-B14D4WZw.css` + 字体子集 + `manifest.json` + `index.html` 共 5 文件,服务器与本地 SHA256 逐字节一致;旧版 `index-Cy-CNcYq.js` 已清理(404),站点根宝塔管理文件保留,`nginx -t` 通过并 reload。线上校验:首页 / JS / CSS / woff2 / manifest 全 200 且 MIME 正确;浏览器(Chrome headless + CDP)访问线上域名跑完整九章闭环——**18 任务全清、active 归零**,8 处对话映射与 4 张新增引路人地图 NPC 装配全部命中,运镜字幕「昆仑雪线之上,瑶池的蟠桃三千年一熟。」实际渲染,字体子集就绪,**console 零 error / 零 4xx**。推送 `f5a706f..0f71f82`,`git ls-remote` 复核远端 HEAD 与本地一致。
 
 ## 复跑方式
 
