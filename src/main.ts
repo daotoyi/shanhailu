@@ -45,6 +45,8 @@ import { SaveMenuUI } from './ui/SaveMenuUI.js';
 import { PlayerHUD } from './ui/PlayerHUD.js';
 import { GamePanels } from './ui/GamePanels.js';
 import { CanvasLoading } from './ui/canvas/CanvasLoading.js';
+import { NarrativeBar } from './ui/NarrativeBar.js';
+import { StoryNav } from './ui/StoryNav.js';
 import { DebugCamera } from './world/DebugCamera.js';
 
 const FONT_SOURCE_LABEL: Record<FontSource, string> = {
@@ -166,6 +168,8 @@ async function boot(): Promise<void> {
     const beast = BEASTS.find((b) => b.monsterId === monsterId);
     if (beast) beasts.recordKill(beast.id);
   });
+  bus.on('quest:accepted', ({ id }) => narrative.onQuestAccepted(id));
+  bus.on('quest:completed', ({ id }) => narrative.onQuestCompleted(id));
   bus.on('beast:caught', ({ name }) => {
     tracker.showBanner(`契约成立 · ${name}`, 2600);
     beasts.setActive(beasts.contracted.length - 1);
@@ -305,6 +309,11 @@ async function boot(): Promise<void> {
   const transition = new TransitionOverlay(ui);
   const prompt = new InteractPrompt(ui);
   const tracker = new QuestTracker(ui, quests, bus);
+  const narrative = new NarrativeBar(ui);
+  const storyNav = new StoryNav(ui, (entry) => {
+    if (transition.isBusy) return;
+    teleportTo(entry.mapId, entry.spawnId);
+  });
   const f3 = new F3Panel(
     bus,
     {
@@ -368,6 +377,7 @@ async function boot(): Promise<void> {
     // BGM 换调(每图一调,五声音阶循环)
     const mapIds = Object.keys(MAPS);
     audio.setKey(mapIds.indexOf(world.maps.def.id));
+    narrative.onChapter(world.maps.def.name, world.maps.def.epigraph);
   };
 
   const teleportTo = (mapId: string, spawnId?: string): void => {
@@ -542,6 +552,7 @@ async function boot(): Promise<void> {
     tween.update(dt);
     minimap.update(dt, world.player.position, world.player.heading, elapsed);
     tracker.update(dt);
+    storyNav.update(state.chapter);
     hud.update(dt, combat.stats, combat.executor, combat.bossInfo);
     combat.hitfx.update(dt, 1280, 720);
     panels.update();
