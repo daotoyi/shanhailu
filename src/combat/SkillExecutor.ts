@@ -62,18 +62,22 @@ export class SkillExecutor {
 
   private nowSec = 0;
 
-  /** 每帧;elapsed 为引擎时钟(与 Enemy poison 判定同基准) */
-  update(dt: number, elapsed: number, playerHeading: number): void {
+  /**
+   * 每帧。animDt 为受 hitstop 缩放的表现层时间(技能前后摇相位);
+   * logicDt 为未缩放的真实步长(CD / 无敌帧 / 连击窗 / 翻滚时长)。
+   * elapsed 为引擎时钟(与 Enemy poison 判定同基准)。
+   */
+  update(animDt: number, logicDt: number, elapsed: number, playerHeading: number): void {
     this.nowSec = elapsed;
     for (const k of Object.keys(this.cds)) {
-      if (this.cds[k]! > 0) this.cds[k] = Math.max(0, this.cds[k]! - dt);
+      if (this.cds[k]! > 0) this.cds[k] = Math.max(0, this.cds[k]! - logicDt);
     }
     if (this.invincibleLeft > 0) {
-      this.invincibleLeft -= dt;
+      this.invincibleLeft -= logicDt;
       if (this.invincibleLeft <= 0) this.invincible = false;
     }
     if (this.comboWindow > 0) {
-      this.comboWindow -= dt;
+      this.comboWindow -= logicDt;
       if (this.comboWindow <= 0) this.comboIndex = 0;
     }
 
@@ -81,12 +85,12 @@ export class SkillExecutor {
       case 'free':
         return;
       case 'dodge':
-        this.t -= dt;
+        this.t -= logicDt;
         if (this.t <= 0) this.state = 'free';
         return;
       default: {
         const skill = this.current!;
-        this.t += dt;
+        this.t += animDt;
         while (this.hitIndex < skill.hitAt.length && this.t >= skill.hitAt[this.hitIndex]!) {
           this.hitIndex++;
           this.executeHit(skill, playerHeading);

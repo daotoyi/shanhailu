@@ -38,17 +38,49 @@ export interface SaveMeta {
   playtimeSec: number;
 }
 
+const ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
+const num = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+const str = (v: unknown): v is string => typeof v === 'string';
+
+/** 导入/反序列化前的结构校验:拒绝残缺档与恶意字段(避免读档崩溃与 innerHTML 注入面) */
+function validate(d: SaveData): void {
+  if (!d || typeof d !== 'object') throw new Error('[Save] 存档不是对象');
+  if (d.version !== SAVE_VERSION) throw new Error(`[Save] 未知存档版本 ${String(d.version)}`);
+  if (!num(d.savedAt) || !num(d.playtimeSec)) throw new Error('[Save] 存档时间字段无效');
+  if (!str(d.chapter) || !ID_RE.test(d.chapter)) throw new Error('[Save] 章节字段无效');
+  if (!str(d.mapId) || !ID_RE.test(d.mapId)) throw new Error('[Save] 地图字段无效');
+  if (!d.flags || typeof d.flags !== 'object' || Array.isArray(d.flags)) throw new Error('[Save] 旗标字段无效');
+  const q = d.quests;
+  if (!q || !Array.isArray(q.active) || !Array.isArray(q.completed)) throw new Error('[Save] 任务字段无效');
+  for (const a of q.active) {
+    if (!a || !str(a.id) || !num(a.stepIndex) || !a.counts || typeof a.counts !== 'object') {
+      throw new Error('[Save] 任务进度字段无效');
+    }
+  }
+  const p = d.player;
+  if (!p || !Array.isArray(p.pos) || p.pos.length !== 3 || !p.pos.every(num) || !num(p.heading)) {
+    throw new Error('[Save] 玩家位姿字段无效');
+  }
+  if (d.bag && (!Array.isArray(d.bag.slots) || !num(d.bag.coins))) throw new Error('[Save] 行囊字段无效');
+  if (d.bestiary && (!d.bestiary.records || !Array.isArray(d.bestiary.contracted))) {
+    throw new Error('[Save] 图鉴字段无效');
+  }
+}
+
 function migrate(raw: unknown): SaveData {
+  if (!raw || typeof raw !== 'object') throw new Error('[Save] 存档不是对象');
   const d = raw as SaveData;
   // 迁移链:v1(纯剧情档)→ v2(补成长/物品空壳)
   if (d.version === 1) {
-    d.version = 2;
-    d.bag = { slots: Array(24).fill(null), coins: 0 };
-    d.equip = { slots: {}, alchemyLevel: 0, alchemyExp: 0 };
-    d.prog = { level: 1, exp: 0, realmIndex: 0 };
+    d.version = SAVE_VERSION;
+    d.savedAt ??= Date.now();
+    d.playtimeSec ??= 0;
+    d.bag ??= { slots: Array(24).fill(null), coins: 0 };
+    d.equip ??= { slots: {}, alchemyLevel: 0, alchemyExp: 0 };
+    d.prog ??= { level: 1, exp: 0, realmIndex: 0 };
   }
-  if (d.version === SAVE_VERSION) return d;
-  throw new Error(`[Save] 未知存档版本 ${d.version}`);
+  validate(d);
+  return d;
 }
 
 /**

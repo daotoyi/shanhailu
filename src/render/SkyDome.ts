@@ -3,9 +3,11 @@ import * as THREE from 'three';
 /**
  * 渐变天空穹顶:天顶青碧 → 地平雾白,太阳盘 + 光晕。
  * 半径 500,世界原点为中心(相机活动范围 ±130,视差可忽略)。
+ * 常驻对象:切图只更新 uniform,不重建(避免重复分配几何体与着色器材质)。
  */
 export class SkyDome {
   readonly mesh: THREE.Mesh;
+  private readonly material: THREE.ShaderMaterial;
 
   constructor(sunDir: THREE.Vector3) {
     const uniforms = {
@@ -54,8 +56,20 @@ export class SkyDome {
         }
       `,
     });
+    this.material = material;
     this.mesh = new THREE.Mesh(new THREE.SphereGeometry(500, 48, 32), material);
     this.mesh.frustumCulled = false;
     this.mesh.renderOrder = -10;
+  }
+
+  setSunDir(dir: THREE.Vector3): void {
+    (this.material.uniforms['uSunDir']!.value as THREE.Vector3).copy(dir).normalize();
+  }
+
+  /** 消费地图环境预设的天空三色(PROMPT §4.3 每图一套灯光/天空) */
+  setColors(zenith: string, mid: string, horizon: string): void {
+    (this.material.uniforms['uZenith']!.value as THREE.Color).set(zenith);
+    (this.material.uniforms['uMid']!.value as THREE.Color).set(mid);
+    (this.material.uniforms['uHorizon']!.value as THREE.Color).set(horizon);
   }
 }

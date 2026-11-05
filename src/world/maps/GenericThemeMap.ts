@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { disposeObject } from '../dispose.js';
 import { Noise2D } from '../../core/Noise.js';
 import { Water } from '../../render/Water.js';
 import { buildTeleporterPad, buildLanternPost, bakeMinimap } from '../structures.js';
@@ -184,13 +185,7 @@ export function buildThemeMap(spec: ThemeSpec): BuiltMap {
     teleporters,
     update: (elapsed) => dynamics.forEach((d) => d(elapsed)),
     dispose: () => {
-      group.traverse((o) => {
-        if (o instanceof THREE.Mesh) {
-          o.geometry.dispose();
-          const m = o.material as THREE.Material | THREE.Material[];
-          (Array.isArray(m) ? m : [m]).forEach((x) => x.dispose());
-        }
-      });
+      disposeObject(group);
     },
     terrain: { height: heightFn, slope: slopeFn },
     addCollider: (c) => colliders.push(c),

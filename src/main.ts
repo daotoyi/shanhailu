@@ -181,6 +181,20 @@ async function boot(): Promise<void> {
     combat.hitfx.hitstop(crit ? 0.08 : 0.045);
     combat.hitfx.shake(crit ? 0.4 : 0.2);
   };
+  /** 每帧复用的神兽协战 hooks,避免每帧新建对象与闭包 */
+  const beastHooks: Parameters<typeof beasts.update>[5] = {
+    damageEnemy: (e, amount, crit, em) => combatHitFeedback(e, amount, crit, em),
+    floatHeal: (amount) => {
+      combat.stats.heal(amount);
+      combat.hitfx.floatDamage(
+        new THREE.Vector3(world.player.position.x, world.player.position.y + 1.8, world.player.position.z),
+        amount,
+        { heal: true },
+      );
+    },
+    playerAtk: combat.stats.block.atk,
+    playerElement: combat.stats.block.element,
+  };
   bus.on('input:action', ({ action, phase }) => {
     if (action === 'toggleRide' && phase === 'start') {
       const target = !beasts.riding;
@@ -332,26 +346,32 @@ async function boot(): Promise<void> {
     heading: world.player.heading,
   });
   const applySave = (data: NonNullable<ReturnType<SaveSystem['load']>>) => {
-    state.deserialize(data);
-    quests.deserialize(data.quests);
-    inventory.deserialize(data.bag ?? { slots: [], coins: 0 });
-    equipment.deserialize(data.equip ?? {});
-    progression.deserialize(data.prog ?? {});
-    const def = MAPS[data.mapId];
-    world.switchMap(data.mapId, def?.spawns[0]!.id ?? 'start');
-    // 精确落位(存档点位姿)
-    world.player.position.set(data.player.pos[0], data.player.pos[1], data.player.pos[2]);
-    world.player.heading = data.player.heading;
-    minimap.setMap(world.maps.map);
-    followCam.snapTo(world.player.position);
-    directorRef?.markChapterDirty();
-    directorRef?.refreshEntities();
-    directorRef?.bindInteractables();
-    beastSystemDeserialize(data);
-    progression.recompute();
-    syncStats();
-    panels.markDirty();
-    tracker.refresh();
+    try {
+      state.deserialize(data);
+      quests.deserialize(data.quests);
+      inventory.deserialize(data.bag ?? { slots: [], coins: 0 });
+      equipment.deserialize(data.equip ?? {});
+      progression.deserialize(data.prog ?? {});
+      combat.clearEnemies(); // 读档切图前清场,防止旧图敌人残留
+      const def = MAPS[data.mapId];
+      world.switchMap(data.mapId, def?.spawns[0]!.id ?? 'start');
+      // 精确落位(存档点位姿)
+      world.player.position.set(data.player.pos[0], data.player.pos[1], data.player.pos[2]);
+      world.player.heading = data.player.heading;
+      minimap.setMap(world.maps.map);
+      followCam.snapTo(world.player.position);
+      directorRef?.markChapterDirty();
+      directorRef?.refreshEntities();
+      directorRef?.bindInteractables();
+      beastSystemDeserialize(data);
+      progression.recompute();
+      syncStats();
+      panels.markDirty();
+      tracker.refresh();
+    } catch (e) {
+      console.error('[Save] 读档失败,已保留当前进度', e);
+      tracker.showBanner('存档损坏 · 已保留当前进度', 2600);
+    }
   };
 
   const beastSystemDeserialize = (data: NonNullable<ReturnType<SaveSystem['load']>>): void => {
@@ -368,6 +388,7 @@ async function boot(): Promise<void> {
   });
 
   const afterMapSwitch = (pos: THREE.Vector3): void => {
+    combat.clearEnemies(); // 切图统一清场(含几何材质/弹道/掉落/飘字)
     minimap.setMap(world.maps.map);
     followCam.snapTo(pos);
     directorRef?.markChapterDirty();
@@ -518,19 +539,9 @@ async function boot(): Promise<void> {
     director.update(dt, elapsed, interactPressed && !dialogFrozen);
 
     // 神兽:协战 + 捕捉交互(优先于 NPC 提示)
-    beasts.update(dt, elapsed, world.player.position, world.player.heading, combat.enemies, {
-      damageEnemy: (e, amount, crit, em) => combatHitFeedback(e, amount, crit, em),
-      floatHeal: (amount) => {
-        combat.stats.heal(amount);
-        combat.hitfx.floatDamage(
-          new THREE.Vector3(world.player.position.x, world.player.position.y + 1.8, world.player.position.z),
-          amount,
-          { heal: true },
-        );
-      },
-      playerAtk: combat.stats.block.atk,
-      playerElement: combat.stats.block.element,
-    });
+    beastHooks.playerAtk = combat.stats.block.atk;
+    beastHooks.playerElement = combat.stats.block.element;
+    beasts.update(dt, elapsed, world.player.position, world.player.heading, combat.enemies, beastHooks);
     if (!dialogFrozen) {
       const near = beasts.catchableNearby(combat.enemies, world.player.position);
       if (near) {

@@ -90,13 +90,23 @@ export class SilhouetteRing {
     void lerp;
   }
 
+  /** 换地平雾色(切图时重着色,避免重建山脊几何体) */
+  setHorizonColor(c: THREE.Color): void {
+    this.horizon.copy(c);
+    this.recolour();
+  }
+
   /** 换远山基色(切图时重着色) */
   setMountainColor(c: THREE.Color): void {
     this.mountain.copy(c);
+    this.recolour();
+  }
+
+  private recolour(): void {
     LAYERS.forEach((spec, i) => {
       const mat = this.meshes[i]!.material as THREE.MeshBasicMaterial;
-      mat.color.copy(c).lerp(this.horizon, spec.hazeMix);
+      mat.color.copy(this.mountain).lerp(this.horizon, spec.hazeMix);
     });
-    (this.skirt.material as THREE.MeshBasicMaterial).color.copy(this.horizon).lerp(c, 0.25);
+    (this.skirt.material as THREE.MeshBasicMaterial).color.copy(this.horizon).lerp(this.mountain, 0.25);
   }
 }

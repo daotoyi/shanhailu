@@ -42,9 +42,7 @@ export class AudioDirector {
           this.volumes = { ...this.volumes, ...JSON.parse(stored) };
         } catch { /* 忽略 */ }
       }
-      // PAL.Audio 无裸 ctx 暴露:经 WebAudio 解码空缓冲触发建轨(实现细节见 PAL)
-      const silent = await pal().audio.decode(new ArrayBuffer(1).byteLength ? new ArrayBuffer(44) : new ArrayBuffer(44));
-      void silent;
+      // 直接建轨并启动 BGM;不得用无效缓冲调 decode(decodeAudioData 会 reject 并让后续静音)
       this.ensureGraph();
       this.startBgm();
     } catch (e) {

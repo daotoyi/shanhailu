@@ -6,15 +6,16 @@ import type { MapEnvironment } from './maps/types.js';
 /**
  * 场景环境(常驻,切图只换参数):渐变天空穹顶 + 远山剪影 + FogExp2 + 三灯预设。
  * 质量管理器绑定的主光引用保持稳定,阴影参数跨图复用。
+ * 天空/远山为常驻对象,切图只更新 uniform 与材质色,不重建。
  */
 export class WorldEnvironment {
   readonly scene = new THREE.Scene();
   readonly sunLight: THREE.DirectionalLight;
   private readonly hemi: THREE.HemisphereLight;
   private readonly rim: THREE.DirectionalLight;
-  private sky: SkyDome;
-  private silhouettes: SilhouetteRing;
-  private fog: THREE.FogExp2;
+  private readonly sky: SkyDome;
+  private readonly silhouettes: SilhouetteRing;
+  private readonly fog: THREE.FogExp2;
   private currentEnv: MapEnvironment | null = null;
 
   constructor() {
@@ -51,13 +52,11 @@ export class WorldEnvironment {
     this.currentEnv = env;
 
     const sunDir = new THREE.Vector3(...env.sunDir).normalize();
-    // 天空/远山:重建(着色器 uniform 少,重建成本低)
-    this.scene.remove(this.sky.mesh, this.silhouettes.group);
-    this.sky = new SkyDome(sunDir);
-    this.silhouettes = new SilhouetteRing(new THREE.Color(env.skyHorizon));
-    // 换远山基色
+    // 只更新常驻对象的 uniform / 材质色,杜绝切图重建导致的 GPU 资源泄漏
+    this.sky.setSunDir(sunDir);
+    this.sky.setColors(env.skyZenith, env.skyMid, env.skyHorizon);
+    this.silhouettes.setHorizonColor(new THREE.Color(env.skyHorizon));
     this.silhouettes.setMountainColor(new THREE.Color(env.mountainColor));
-    this.scene.add(this.sky.mesh, this.silhouettes.group);
 
     this.fog.color.set(env.fogColor);
     this.fog.density = env.fogDensity;

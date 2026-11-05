@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { disposeObject } from '../dispose.js';
 import { Noise2D } from '../../core/Noise.js';
 import { Water } from '../../render/Water.js';
 import { buildGateArch, buildShopStall, buildTeleporterPad, buildLanternPost, bakeMinimap } from '../structures.js';
@@ -186,13 +187,7 @@ class DahuangCityMap implements BuiltMap {
   }
 
   dispose(): void {
-    this.group.traverse((o) => {
-      if (o instanceof THREE.Mesh) {
-        o.geometry.dispose();
-        const m = o.material as THREE.Material | THREE.Material[];
-        (Array.isArray(m) ? m : [m]).forEach((x) => x.dispose());
-      }
-    });
+    disposeObject(this.group);
   }
 }
 

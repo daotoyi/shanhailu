@@ -64,5 +64,8 @@ export class QualityManager {
     }
     t.postfx.setBloomEnabled(preset.bloom);
     t.postfx.setVignetteEnabled(preset.vignette);
+    // setPixelRatio 已变更,composer 必须同步其缓存的 _pixelRatio
+    // (实测低画质走 composer 比直出更省 draw calls,且保留暗角/色调统一,故不做直出)
+    t.postfx.syncPixelRatio();
   }
 }

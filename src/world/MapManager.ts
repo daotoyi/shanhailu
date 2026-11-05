@@ -1,6 +1,7 @@
 import type { BuiltMap, MapDefinition } from './maps/types.js';
 import { MAPS } from '../data/maps.js';
 import { WorldEnvironment } from './Environment.js';
+import { batchStaticMeshes } from './batchStatic.js';
 
 /**
  * 地图管理器:加载/卸载/切换;环境预设随图应用。
@@ -39,6 +40,8 @@ export class MapManager {
       this.current = null;
     }
     const map = def.build();
+    // 静态构件合批:主 pass 与阴影 pass 同时降 draw calls(动态/发光件自动跳过)
+    batchStaticMeshes(map.group);
     this.env.scene.add(map.group);
     this.env.apply(def.environment);
     this.current = map;

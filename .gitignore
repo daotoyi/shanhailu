@@ -4,4 +4,8 @@ dist/
 tools/.cache/
 *.log
 .DS_Store
-public/assets/fonts/*.woff2
+# 源字体(大文件)不入 git;子集 woff2 需入库以保证新环境构建可复现
+public/assets/fonts/*.ttf
+public/assets/fonts/*.otf
+# 本地 AI 工作日志(含部署环境信息),不入库
+.workbuddy/

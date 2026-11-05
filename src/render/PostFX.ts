@@ -37,11 +37,18 @@ const VignetteShader = {
 /**
  * 后处理链:Render → Bloom(克制) → 暗角 → OutputPass(色调映射+sRGB)。
  * 渲染器 toneMapping 设为 ACESFilmic,r152+ 管线在 OutputPass 统一执行。
+ *
+ * composer 只缓存构造时的 _pixelRatio,画质档 / DPR 变化必须显式同步,
+ * 否则 HiDPI 下 RT 恒为 1× CSS 尺寸(画面发糊)、low 档降分辨率不生效。
  */
 export class PostFX {
   readonly composer: EffectComposer;
   private readonly bloomPass: UnrealBloomPass;
   private readonly vignettePass: ShaderPass;
+  private readonly renderer: THREE.WebGLRenderer;
+  private width: number;
+  private height: number;
+  private lastDpr = -1;
 
   constructor(
     renderer: THREE.WebGLRenderer,
@@ -50,6 +57,9 @@ export class PostFX {
     width: number,
     height: number,
   ) {
+    this.renderer = renderer;
+    this.width = width;
+    this.height = height;
     const target = new THREE.WebGLRenderTarget(width, height, {
       type: THREE.HalfFloatType,
       samples: 4,
@@ -65,7 +75,21 @@ export class PostFX {
   }
 
   setSize(width: number, height: number): void {
+    this.width = width;
+    this.height = height;
+    const dpr = this.renderer.getPixelRatio();
+    this.lastDpr = dpr;
+    this.composer.setPixelRatio(dpr);
     this.composer.setSize(width, height);
+  }
+
+  /** 画质档位改变 pixelRatio 后同步 composer 缓存的 _pixelRatio */
+  syncPixelRatio(): void {
+    const dpr = this.renderer.getPixelRatio();
+    if (dpr === this.lastDpr) return;
+    this.lastDpr = dpr;
+    this.composer.setPixelRatio(dpr);
+    this.composer.setSize(this.width, this.height);
   }
 
   setBloomEnabled(on: boolean): void {

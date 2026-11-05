@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { disposeObject } from '../dispose.js';
 import { Water } from '../../render/Water.js';
 import { WATER_LEVEL, Terrain } from '../Terrain.js';
 import { Vegetation } from '../Vegetation.js';
@@ -141,13 +142,7 @@ class YaowangValleyMap implements BuiltMap {
   }
 
   dispose(): void {
-    this.group.traverse((o) => {
-      if (o instanceof THREE.Mesh) {
-        o.geometry.dispose();
-        const m = o.material as THREE.Material | THREE.Material[];
-        (Array.isArray(m) ? m : [m]).forEach((x) => x.dispose());
-      }
-    });
+    disposeObject(this.group);
   }
 }
 

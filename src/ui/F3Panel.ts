@@ -53,7 +53,6 @@ export class F3Panel {
       .memory;
     const p = this.data.camera.position;
     const lines = [
-      `<b>大荒山海录 · F3 调试</b>`,
       `FPS      ${this.data.time.fps.toFixed(0).padStart(4)}   (帧 ${this.data.time.rawMs.toFixed(1)}ms)`,
       `DrawCall ${String(info.render.calls).padStart(4)}   三角 ${(info.render.triangles / 1000).toFixed(1)}k`,
       `几何体   ${info.memory.geometries}   纹理 ${info.memory.textures}   程序 ${info.programs?.length ?? 0}`,
@@ -62,7 +61,10 @@ export class F3Panel {
       `画质     ${QUALITY_LABEL[this.data.quality()]}`,
       this.data.extra?.() ?? '',
     ];
-    this.node.innerHTML = lines.join('\n');
+    // 纯文本写入:extra 可能来自存档字段,禁止 innerHTML 拼接
+    const title = document.createElement('b');
+    title.textContent = '大荒山海录 · F3 调试';
+    this.node.replaceChildren(title, document.createTextNode(`\n${lines.join('\n')}`));
   }
 
   dispose(): void {

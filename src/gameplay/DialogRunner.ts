@@ -107,6 +107,8 @@ export class DialogRunner {
     this.history.push({ speaker: node.speaker ?? '', text: node.text });
     const choices = (node.choices ?? []).map((c, i) => ({ index: i + 1, text: c.text }));
     this.ui.render(node, choices);
+    // render 会清空正文以启动打字机;此处补全,避免打完字到玩家点击期间空白
+    this.ui.updateTyping(node.text.length);
   }
 
   /** 快进:打字中→立即补全;已完→下一句 */

@@ -110,8 +110,12 @@ export class ScenarioDirector {
 
   /* ============ 章节装配 ============ */
 
-  /** 每帧调用;依旗标刷新实体(廉价:旗标不变时跳过) */
+  /** 仅在章节/旗标被显式标脏时重建实体,避免每帧拼 key 与 filter 闭包 */
+  private entitiesDirty = true;
+
   refreshEntities(): void {
+    if (!this.entitiesDirty) return;
+    this.entitiesDirty = false;
     const key = `${this.state.chapter}|${Object.keys(this.state.flags).filter((k) => this.state.flags[k] === true).join(',')}`;
     if (key === this.spawnedForChapter) return;
     this.spawnedForChapter = key;
@@ -210,6 +214,7 @@ export class ScenarioDirector {
 
   /** QuestTracker 等处触发旗标变化后调用刷新 */
   markChapterDirty(): void {
+    this.entitiesDirty = true;
     this.spawnedForChapter = '';
   }
 

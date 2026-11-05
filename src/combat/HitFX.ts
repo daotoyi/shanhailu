@@ -56,6 +56,13 @@ export class HitFX {
     this.follow.addShake(amount);
   }
 
+  /** 切图/读档时清空在途飘字,避免旧场景的数字残留上屏 */
+  clear(): void {
+    for (const t of this.live) this.pool.release(t);
+    this.live.length = 0;
+    this.stopLeft = 0;
+  }
+
   /** 伤害飘字;crit/克制 加色放大 */
   floatDamage(worldPos: THREE.Vector3, amount: number, opts: { crit?: boolean; elementMul?: number; dodged?: boolean; heal?: boolean } = {}): void {
     const t = this.pool.acquire();

@@ -20,6 +20,17 @@ export class PlayerHUD {
   private readonly bossName: HTMLDivElement;
   private readonly ultFlash: HTMLDivElement;
   private flashT = 0;
+  /** DOM 写入缓存:数值未变时不触发 style 重算与文本节点重建 */
+  private lastHpW = '';
+  private lastMpW = '';
+  private lastHpText = '';
+  private lastUltW = '';
+  private lastUltOpacity = '';
+  private lastBossDisplay = '';
+  private lastBossW = '';
+  private lastBossName = '';
+  private readonly lastCdH: string[] = [];
+  private readonly lastNames: string[] = [];
 
   constructor(stage: { append(...nodes: HTMLElement[]): void }) {
     this.root = document.createElement('div');
@@ -120,36 +131,45 @@ export class PlayerHUD {
   }
 
   update(dt: number, stats: CombatantStats, executor: SkillExecutor, boss: { name: string; hp: number; maxHp: number } | null): void {
-    this.hpFill.style.width = `${Math.max(0, stats.hp / stats.block.maxHp) * 100}%`;
-    this.mpFill.style.width = `${Math.max(0, stats.mp / stats.block.maxMp) * 100}%`;
-    this.hpText.textContent = `${Math.ceil(Math.max(0, stats.hp))} / ${stats.block.maxHp}   灵 ${Math.ceil(stats.mp)}`;
-    // 技能槽:名称 + CD 遮罩
-    PLAYER_SKILL_SLOTS.forEach((id, i) => {
+    const hpW = `${Math.max(0, stats.hp / stats.block.maxHp) * 100}%`;
+    if (hpW !== this.lastHpW) { this.hpFill.style.width = hpW; this.lastHpW = hpW; }
+    const mpW = `${Math.max(0, stats.mp / stats.block.maxMp) * 100}%`;
+    if (mpW !== this.lastMpW) { this.mpFill.style.width = mpW; this.lastMpW = mpW; }
+    const hpText = `${Math.ceil(Math.max(0, stats.hp))} / ${stats.block.maxHp}   灵 ${Math.ceil(stats.mp)}`;
+    if (hpText !== this.lastHpText) { this.hpText.textContent = hpText; this.lastHpText = hpText; }
+
+    // 技能槽:名称 + CD 遮罩,仅在值变化时写 DOM
+    for (let i = 0; i < PLAYER_SKILL_SLOTS.length; i++) {
+      const id = PLAYER_SKILL_SLOTS[i]!;
       const def = SKILLS[id]!;
-      const nameEl = this.slots[i + 1]!.children[2] as HTMLDivElement;
-      if (nameEl) nameEl.textContent = def.name.slice(0, 2);
-      const cdEl = this.slotCds[i + 1]!;
+      const name = def.name.slice(0, 2);
+      if (this.lastNames[i + 1] !== name) {
+        const nameEl = this.slots[i + 1]!.children[2] as HTMLDivElement;
+        if (nameEl) nameEl.textContent = name;
+        this.lastNames[i + 1] = name;
+      }
       const cd = executor.getCd(id);
-      cdEl.style.height = `${cd > 0 ? (cd / def.cd) * 100 : 0}%`;
-    });
-    const ultDef = SKILLS[PLAYER_ULT]!;
-    const ultName = this.slots[0]!.children[2] as HTMLDivElement;
-    if (ultName) ultName.textContent = '';
-    const ultCd = this.slotCds[0]!;
-    const readyRatio = stats.ultCharge / 100;
-    this.ultRing.style.height = `${readyRatio * 100}%`;
-    this.ultText.style.opacity = stats.ultCharge >= 100 ? '1' : '0.45';
-    void ultCd;
-    void ultDef;
-    // Boss 条
-    if (boss) {
-      this.bossBar.style.display = 'block';
-      this.bossFill.style.width = `${Math.max(0, boss.hp / boss.maxHp) * 100}%`;
-      this.bossName.textContent = boss.name;
-    } else {
-      this.bossBar.style.display = 'none';
+      const h = `${cd > 0 ? (cd / def.cd) * 100 : 0}%`;
+      if (this.lastCdH[i + 1] !== h) {
+        this.slotCds[i + 1]!.style.height = h;
+        this.lastCdH[i + 1] = h;
+      }
     }
-    // 大招白闪衰减
+    const ultName = this.slots[0]!.children[2] as HTMLDivElement;
+    if (ultName && this.lastNames[0] !== '') { ultName.textContent = ''; this.lastNames[0] = ''; }
+    const ultW = `${stats.ultCharge}%`;
+    if (ultW !== this.lastUltW) { this.ultRing.style.height = ultW; this.lastUltW = ultW; }
+    const ultOpacity = stats.ultCharge >= 100 ? '1' : '0.45';
+    if (ultOpacity !== this.lastUltOpacity) { this.ultText.style.opacity = ultOpacity; this.lastUltOpacity = ultOpacity; }
+
+    const bossDisplay = boss ? 'block' : 'none';
+    if (bossDisplay !== this.lastBossDisplay) { this.bossBar.style.display = bossDisplay; this.lastBossDisplay = bossDisplay; }
+    if (boss) {
+      const bw = `${Math.max(0, boss.hp / boss.maxHp) * 100}%`;
+      if (bw !== this.lastBossW) { this.bossFill.style.width = bw; this.lastBossW = bw; }
+      if (boss.name !== this.lastBossName) { this.bossName.textContent = boss.name; this.lastBossName = boss.name; }
+    }
+    // 大招白闪衰减(逐帧变化,必须每帧写)
     if (this.flashT > 0) {
       this.flashT -= dt;
       this.ultFlash.style.opacity = String(Math.max(0, this.flashT / 0.5));

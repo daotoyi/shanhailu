@@ -34,6 +34,9 @@ export class SaveMenuUI {
     hint.className = 'dsh-label dim';
     hint.style.cssText = 'font-size:12px;text-align:center;margin:8px 0 14px;';
     hint.textContent = '神祠是上古存息之地:可歇息存档,亦可借香火远行。';
+    this.status = document.createElement('div');
+    this.status.className = 'dsh-label dim';
+    this.status.style.cssText = 'font-size:12px;text-align:center;min-height:16px;margin:-6px 0 10px;color:#c9a25c;';
     this.slotsBox = document.createElement('div');
     this.slotsBox.style.cssText = 'display:flex;flex-direction:column;gap:8px;';
     const actions = document.createElement('div');
@@ -45,12 +48,16 @@ export class SaveMenuUI {
     exportBtn.className = 'dsh-btn';
     exportBtn.style.fontSize = '12px';
     exportBtn.textContent = '导出存档码';
+    const importBtn = document.createElement('button');
+    importBtn.className = 'dsh-btn';
+    importBtn.style.fontSize = '12px';
+    importBtn.textContent = '导入存档码';
     const closeBtn = document.createElement('button');
     closeBtn.className = 'dsh-btn';
     closeBtn.style.fontSize = '12px';
     closeBtn.textContent = '离开 (E)';
-    actions.append(this.teleportBtn, exportBtn, closeBtn);
-    this.root.append(title, hint, this.slotsBox, actions);
+    actions.append(this.teleportBtn, exportBtn, importBtn, closeBtn);
+    this.root.append(title, hint, this.status, this.slotsBox, actions);
     stage.append(this.root);
 
     closeBtn.addEventListener('click', () => this.close());
@@ -58,9 +65,31 @@ export class SaveMenuUI {
       const code = this.save.exportCode(0) ?? this.save.exportCode(1) ?? this.save.exportCode(2);
       this.teleportBtn.ownerDocument.defaultView?.prompt?.('存档码(自动档优先):', code ?? '(空)');
     });
+    importBtn.addEventListener('click', () => {
+      const view = this.root.ownerDocument.defaultView;
+      const code = view?.prompt?.('粘贴存档码:');
+      if (!code) return;
+      const raw = view?.prompt?.('存入档位 (1 / 2 / 3):', '3');
+      const slot = Number(raw) - 1;
+      if (!Number.isInteger(slot) || slot < 0 || slot > 2) {
+        this.setStatus('档位无效,请输入 1 / 2 / 3');
+        return;
+      }
+      const ok = this.save.importCode(code, slot);
+      this.setStatus(ok ? `存档码已导入档位 ${slot + 1}` : '存档码无效或版本不匹配');
+      if (ok) this.renderSlots();
+    });
   }
 
   private readonly teleportBtn: HTMLButtonElement;
+  private readonly status: HTMLDivElement;
+
+  private setStatus(text: string): void {
+    this.status.textContent = text;
+    window.setTimeout(() => {
+      if (this.status.textContent === text) this.status.textContent = '';
+    }, 3200);
+  }
 
   private renderSlots(): void {
     this.slotsBox.innerHTML = '';
