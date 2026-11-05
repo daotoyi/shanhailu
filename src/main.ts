@@ -398,7 +398,7 @@ async function boot(): Promise<void> {
     // BGM 换调(每图一调,五声音阶循环)
     const mapIds = Object.keys(MAPS);
     audio.setKey(mapIds.indexOf(world.maps.def.id));
-    narrative.onChapter(world.maps.def.name, world.maps.def.epigraph);
+    narrative.onChapterScript(state.chapter, world.maps.def.name, world.maps.def.epigraph, world.maps.def.id);
   };
 
   const teleportTo = (mapId: string, spawnId?: string): void => {

@@ -1,59 +1,22 @@
 import * as THREE from 'three';
 import type { World } from '../world/World.js';
-import type { TriggerSystem, Patroller } from '../world/Triggers.js';
+import type { TriggerSystem } from '../world/Triggers.js';
 import type { GameState } from './GameState.js';
 import type { QuestManager } from './QuestManager.js';
 import type { DialogRunner } from './DialogRunner.js';
 import type { CinematicPlayer, CinematicDef } from '../render/Cinematic.js';
-import { NPC, type NPC as NPCT } from '../actor/NPC.js';
+import type { NPC as NPCT } from '../actor/NPC.js';
+import { createNpc, createCh1Patrols } from './NpcFactory.js';
+import { CINEMATICS } from '../data/story/cinematics.js';
+import {
+  CHAPTER_ORDER, CHAPTER_SCRIPTS, chapterByKey, chapterByQuest,
+  npcsForChapter, npcById, type ChapterKey, type ChapterNpcDef,
+} from '../data/story/chapters.js';
 import { CollectibleHerb } from './Collectible.js';
 import type { InteractPrompt } from '../ui/InteractPrompt.js';
 import type { QuestTracker } from '../ui/QuestTracker.js';
 
-/** 开场运镜:山谷晨景 → 少年 */
-const CIN_OPENING: CinematicDef = {
-  id: 'cin_opening',
-  keyframes: [
-    { pos: [-34, 24, 26], lookAt: [0, 3, 0], dur: 5.0 },
-    { pos: [-10, 9, -8], lookAt: [0, 2, -16], dur: 4.5 },
-    { pos: [3.4, 2.6, -11.5], lookAt: [0, 1.6, -16], dur: 3.2, ease: 'inout' },
-  ],
-  subtitles: [
-    { at: 0.6, dur: 4.0, text: '上古蛮荒,大荒五族并立,共尊炎帝神农氏为天下共主。' },
-    { at: 5.2, dur: 3.6, text: '药王谷的晨雾里,少年还不知道自己将背负怎样的遗命……' },
-  ],
-  onEndActions: ['quest:accept:q_prologue_1'],
-};
-
-/** 第一章末过场:月下托孤 */
-const CIN_CH1_END: CinematicDef = {
-  id: 'cin_ch1_end',
-  keyframes: [
-    { pos: [8, 4.2, -22], lookAt: [0, 2.5, -30], dur: 4.0 },
-    { pos: [-6, 5.5, -38], lookAt: [0, 3, -30], dur: 4.5, ease: 'inout' },
-  ],
-  subtitles: [
-    { at: 0.4, dur: 3.4, text: '香火明灭处,少年把《神农本草经》贴身收好。' },
-    { at: 4.2, dur: 3.8, text: '南方,九黎的山影在夜色里起伏——蚩尤还在那里等他。' },
-  ],
-  onEndActions: ['flag:story.ch1_done'],
-};
-
-/** 终章结局过场:不周天倾(留续章) */
-const CIN_ENDING: CinematicDef = {
-  id: 'cin_ending',
-  keyframes: [
-    { pos: [16, 6, -18], lookAt: [-6, 20, -40], dur: 5.0 },
-    { pos: [2, 3.4, -24], lookAt: [-6, 24, -40], dur: 4.6, ease: 'inout' },
-    { pos: [-10, 10, -34], lookAt: [-30, 6, -10], dur: 5.0 },
-  ],
-  subtitles: [
-    { at: 0.5, dur: 3.6, text: '共工败退,却猛然回身,用尽全力撞向不周山——' },
-    { at: 4.6, dur: 3.6, text: '天柱折,地维绝。天倾西北,水潦尘埃归东南。' },
-    { at: 8.8, dur: 3.8, text: '洪水滔天而来。少年握紧神农尺,站进了风雨里。(续章·未完)' },
-  ],
-  onEndActions: ['flag:story.ending_seen'],
-};
+/** 过场定义已移至 data/story/cinematics.ts(数据驱动,九章卷首运镜同表) */
 
 /** 章节→地图与战斗波 */
 const CHAPTER_WAVES: Record<string, { mapId: string }> = {
@@ -123,15 +86,10 @@ export class ScenarioDirector {
     const scene = this.world.scene;
     const heightAt = this.world.heightAt;
 
+    // 九章 NPC 统一按章节剧本表装配(含出现条件)
+    this.spawnChapterNpcs(heightAt);
+
     if (this.state.chapter === 'prologue') {
-      // 药翁师父
-      const master = this.makeNpc('npc_master', '药翁', 'master', 'apprentice', [-14, -14.5], 0.9, heightAt);
-      this.npcs.push(master);
-      // 驿卒(噩耗后出现在谷口驿亭)
-      if (this.quests.isActive('q_prologue_2')) {
-        const courier = this.makeNpc('npc_courier', '驿卒', 'courier', 'courier', [16, -4], -1.2, heightAt);
-        this.npcs.push(courier);
-      }
       // 采集物:青茎芝 ×4
       for (const [hx, hz, idx] of [[-8, 14, 1], [18, 8, 2], [-19, -4, 3], [9, 22, 4]] as const) {
         const herb = new CollectibleHerb(`herb_${idx}`, 'herb_qingjingzhi', hx, hz, heightAt);
@@ -143,33 +101,10 @@ export class ScenarioDirector {
         this.hooks.spawnWave('prologue_battle');
       }
     } else if (this.state.chapter === 'ch1') {
-      // 药翁(夜谈)
-      const master = this.makeNpc('npc_master', '药翁', 'master', 'apprentice', [-14, -14.5], 0.9, heightAt);
-      this.npcs.push(master);
-      // 潜行区:两个杀手巡逻(神祠南侧路上)
+      // 潜行区:两名火把缇骑(神祠南侧路上)
       if (this.quests.isActive('q_ch1_1') && !this.state.getFlag('story.ch1_done')) {
-        const p1: Patroller = {
-          group: this.makeKiller('#5a2c22'),
-          path: [new THREE.Vector3(-4, 0, -20), new THREE.Vector3(-4, 0, -34), new THREE.Vector3(-9, 0, -34), new THREE.Vector3(-9, 0, -20)],
-          speed: 0.055,
-          visionDist: 7.5,
-          visionAngle: 0.62,
-          legPhase: 0,
-        };
-        const p2: Patroller = {
-          group: this.makeKiller('#33291f'),
-          path: [new THREE.Vector3(5, 0, -36), new THREE.Vector3(5, 0, -22), new THREE.Vector3(10, 0, -22), new THREE.Vector3(10, 0, -36)],
-          speed: 0.045,
-          visionDist: 7.0,
-          visionAngle: 0.6,
-          legPhase: 0,
-        };
         const heightFn = heightAt;
-        for (const p of [p1, p2]) {
-          for (const v of p.path) v.y = heightFn(v.x, v.z) + 0.02;
-          p.group.position.copy(p.path[0]!);
-          this.triggers.addPatroller(scene, p);
-        }
+        for (const p of createCh1Patrols(heightFn)) this.triggers.addPatroller(scene, p);
         // 到达神祠(触发对话,完成第一章)+ 信标
         this.triggers.addZone({
           id: 'zone_shrine_stealth',
@@ -188,19 +123,7 @@ export class ScenarioDirector {
       const questId = Object.keys(CHAPTER_WAVES).find((q) => this.quests.isActive(q));
       const waveDef = questId ? CHAPTER_WAVES[questId]! : null;
 
-      // 章节 NPC
-      if (mapId === 'jiuli-nanjiang') {
-        this.npcs.push(this.makeNpc('npc_chiyou', '蚩尤', 'chiyou', 'miao', [-3, -8], 2.6, heightAt));
-      }
-      if (mapId === 'shenlou-city') {
-        this.npcs.push(this.makeNpc('npc_yushiqie', '雨师妾', 'yushiqie', 'shui', [4, -10], 0.4, heightAt));
-      }
-      if (mapId === 'buzhou' && questId === 'q_ch8_1' && this.quests.getActiveQuest('q_ch8_1')?.stepIndex === 0) {
-        // 共工(对峙形态)
-        this.npcs.push(this.makeNpc('npc_gonggong', '共工', 'gonggong', 'shui', [0, -26], 3.4, heightAt));
-      }
-
-      // 章节战斗波(地图匹配 + 敌人未刷)
+      // 章节战斗波(地图匹配 + 敌人未刷);NPC 已在方法开头按剧本表统一装配
       if (waveDef && waveDef.mapId === mapId && this.hooks.combatEnemyCount() === 0) {
         const chKey = questId!.replace('q_', '').split('_')[0]!;
         if (questId === 'q_ch8_1' && this.quests.getActiveQuest('q_ch8_1')!.stepIndex === 0) {
@@ -218,6 +141,25 @@ export class ScenarioDirector {
     this.spawnedForChapter = '';
   }
 
+  /** 按章节剧本表装配本章 NPC(同屏最多 1~2 个,不增加渲染预算) */
+  private spawnChapterNpcs(heightAt: (x: number, z: number) => number): void {
+    const script = chapterByKey(this.state.chapter);
+    if (!script || this.world.maps.def.id !== script.mapId) return;
+    for (const def of npcsForChapter(this.state.chapter)) {
+      if (!this.npcVisible(def)) continue;
+      this.npcs.push(createNpc(this.world.scene, def.id, def.name, def.palette, def.pos, def.heading, heightAt));
+    }
+  }
+
+  private npcVisible(def: ChapterNpcDef): boolean {
+    if (!def.when) return true;
+    return def.when.some((w) => {
+      const [qid, step] = w.split('#');
+      const a = this.quests.getActiveQuest(qid!);
+      return !!a && (step === undefined || a.stepIndex === Number(step));
+    });
+  }
+
   private clearEntities(): void {
     const scene = this.world.scene;
     for (const n of this.npcs) n.removeFrom(scene);
@@ -227,43 +169,6 @@ export class ScenarioDirector {
     for (const m of this.markers) scene.remove(m);
     this.markers = [];
     this.triggers.clear(scene);
-  }
-
-  private makeNpc(
-    id: string,
-    name: string,
-    _paletteKey: string,
-    paletteId: string,
-    pos: [number, number],
-    heading: number,
-    heightAt: (x: number, z: number) => number,
-  ): NPCT {
-    const npc = new NPC(id, name, paletteId, pos, heading, heightAt);
-    npc.addTo(this.world.scene);
-    return npc;
-  }
-
-  private makeKiller(color: string): THREE.Group {
-    const g = new THREE.Group();
-    const body = new THREE.Mesh(
-      new THREE.ConeGeometry(0.42, 1.5, 6),
-      new THREE.MeshStandardMaterial({ color, flatShading: true, roughness: 0.9 }),
-    );
-    body.position.y = 0.75;
-    body.castShadow = true;
-    const head = new THREE.Mesh(
-      new THREE.SphereGeometry(0.18, 8, 6),
-      new THREE.MeshStandardMaterial({ color: '#1a140e', flatShading: true }),
-    );
-    head.position.y = 1.62;
-    // 火把(发光点,警戒可读性)
-    const torch = new THREE.Mesh(
-      new THREE.SphereGeometry(0.14, 6, 6),
-      new THREE.MeshStandardMaterial({ color: '#ff9a3c', emissive: '#ff6a1a', emissiveIntensity: 2.2 }),
-    );
-    torch.position.set(0.4, 1.5, 0.3);
-    g.add(body, head, torch);
-    return g;
   }
 
   /* ============ 交互与对话选择 ============ */
@@ -301,28 +206,15 @@ export class ScenarioDirector {
     }
   }
 
-  /** 依剧情状态选择 NPC 对话树 */
+  /** 依章节剧本表选择 NPC 对话树:任务#步骤 精确匹配 → 任务匹配 → 闲谈兜底 */
   private pickDialog(npcId: string): string | null {
-    if (npcId === 'npc_master') {
-      if (this.quests.isActive('q_ch1_1')) return 'dlg_npc_master_3';
-      const p2 = this.quests.getActiveQuest('q_prologue_2');
-      if (p2 && p2.stepIndex === 0) return 'dlg_npc_master_2';
-      if (this.quests.isActive('q_prologue_1')) return 'dlg_npc_master';
-      return 'dlg_npc_master_done';
+    const def = npcById(npcId);
+    if (!def) return null;
+    for (const a of this.quests.getActiveList()) {
+      const hit = def.dialogs[`${a.id}#${a.stepIndex}`] ?? def.dialogs[a.id];
+      if (hit) return hit;
     }
-    if (npcId === 'npc_courier') return 'dlg_npc_courier';
-    if (npcId === 'npc_chiyou') {
-      return this.quests.isActive('q_ch2_1') && this.quests.getActiveQuest('q_ch2_1')!.stepIndex === 0
-        ? 'dlg_npc_chiyou'
-        : 'dlg_npc_chiyou_done';
-    }
-    if (npcId === 'npc_yushiqie') {
-      return this.quests.isActive('q_ch4_1') && this.quests.getActiveQuest('q_ch4_1')!.stepIndex === 0
-        ? 'dlg_npc_yushiqie'
-        : 'dlg_npc_yushiqie_2';
-    }
-    if (npcId === 'npc_gonggong') return 'dlg_gonggong';
-    return null;
+    return def.dialogs['idle'] ?? null;
   }
 
   /* ============ 效果指令(对话/过场共用) ============ */
@@ -344,6 +236,9 @@ export class ScenarioDirector {
       this.quests.forceAdvance(rest[1]!);
     } else if (kind === 'quest' && rest[0] === 'talk') {
       this.quests.progress('talk', rest[1]!);
+    } else if (kind === 'cin' && rest[0] === 'play') {
+      const def = CINEMATICS[rest[1] ?? ''];
+      if (def) this.playCinematic(def);
     }
     void action;
   }
@@ -426,7 +321,7 @@ export class ScenarioDirector {
 
   /* ============ 章节流转 ============ */
 
-  /** 监听任务完成,推进章节(由 main 桥接 quest:completed) */
+  /** 监听任务完成,按章节剧本表推进章内/章间流程(序章与终章保留特例) */
   onQuestCompleted(id: string): void {
     if (id === 'q_prologue_1') {
       // 晨课完 → 教学战斗(疫鬼)
@@ -440,59 +335,43 @@ export class ScenarioDirector {
       this.tracker.showBanner('主线推进 · 噩耗传来', 2200);
     } else if (id === 'q_prologue_2') {
       this.state.setChapter('ch1');
-      this.quests.accept('q_ch1_1'); // 章首自动接取(主线)
+      this.quests.accept('q_ch1_1');
       this.markChapterDirty();
-      this.tracker.showBanner('第一章 · 神农遗命', 2600);
+      this.tracker.showBanner(CHAPTER_SCRIPTS.ch1.banner, 2600);
       this.hooks.onAutosaveHint();
     } else if (id === 'q_ch1_1') {
-      // 月下托孤过场
-      this.playCinematic(CIN_CH1_END);
+      // 月下托孤过场 → 第二章引子任务
+      this.playCinematic(CINEMATICS['cin_ch1_end']!);
       this.state.setChapter('ch2');
-      this.quests.accept('q_ch2_1');
+      this.quests.accept('q_ch2_0');
       this.markChapterDirty();
-    } else if (id === 'q_ch2_1') {
-      this.state.setChapter('ch3');
-      this.quests.accept('q_ch3_1');
-      this.markChapterDirty();
-      this.tracker.showBanner('前往东海 · 汤谷', 2400);
-      this.hooks.onAutosaveHint();
-    } else if (id === 'q_ch3_1') {
-      this.state.setChapter('ch4');
-      this.quests.accept('q_ch4_1');
-      this.markChapterDirty();
-      this.tracker.showBanner('海市蜃楼 · 蜃楼迷城', 2400);
-      this.hooks.onAutosaveHint();
-    } else if (id === 'q_ch4_1') {
-      this.state.setChapter('ch5');
-      this.quests.accept('q_ch5_1');
-      this.markChapterDirty();
-      this.tracker.showBanner('西行昆仑 · 蟠桃会', 2400);
-      this.hooks.onAutosaveHint();
-    } else if (id === 'q_ch5_1') {
-      this.state.setChapter('ch6');
-      this.quests.accept('q_ch6_1');
-      this.markChapterDirty();
-      this.tracker.showBanner('魂入幽都 · 问魂', 2400);
-      this.hooks.onAutosaveHint();
-    } else if (id === 'q_ch6_1') {
-      this.state.setChapter('ch7');
-      this.quests.accept('q_ch7_1');
-      this.markChapterDirty();
-      this.tracker.showBanner('水妖作乱 · 大荒水泽', 2400);
-      this.hooks.onAutosaveHint();
-    } else if (id === 'q_ch7_1') {
-      this.state.setChapter('ch8');
-      this.quests.accept('q_ch8_1');
-      this.markChapterDirty();
-      this.tracker.showBanner('终章 · 不周天倾', 2600);
+      this.tracker.showBanner(CHAPTER_SCRIPTS.ch2.banner, 2600);
       this.hooks.onAutosaveHint();
     } else if (id === 'q_ch8_1') {
       // 结局过场 + 尾声对话
-      this.playCinematic(CIN_ENDING);
+      this.playCinematic(CINEMATICS['cin_ending']!);
       this.cinBindEnd(() => this.dialogs.start('dlg_ending', () => {
         this.tracker.showBanner('《大荒山海录》本卷终 · 感谢游玩', 4000);
       }));
       this.hooks.onAutosaveHint();
+    } else {
+      // 二~终章通用流转:章内接下一任务;章末换章并接下一章首任务
+      const script = chapterByQuest(id);
+      const idx = script ? script.quests.indexOf(id) : -1;
+      if (!script || idx < 0) return;
+      if (idx < script.quests.length - 1) {
+        this.quests.accept(script.quests[idx + 1]!);
+        this.markChapterDirty();
+      } else {
+        const nextKey = CHAPTER_ORDER[CHAPTER_ORDER.indexOf(script.key as ChapterKey) + 1];
+        const next = nextKey ? CHAPTER_SCRIPTS[nextKey] : undefined;
+        if (!next) return;
+        this.state.setChapter(next.key);
+        this.quests.accept(next.quests[0]!);
+        this.markChapterDirty();
+        this.tracker.showBanner(next.banner, 2600);
+        this.hooks.onAutosaveHint();
+      }
     }
   }
 
@@ -511,6 +390,6 @@ export class ScenarioDirector {
 
   /** 启动开场(仅新档) */
   playOpening(): void {
-    this.playCinematic(CIN_OPENING);
+    this.playCinematic(CINEMATICS['cin_opening']!);
   }
 }

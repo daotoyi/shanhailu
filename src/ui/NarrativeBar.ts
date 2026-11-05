@@ -1,4 +1,5 @@
 import { QUESTS } from '../data/quests.js';
+import { chapterByQuest, chapterByKey } from '../data/story/chapters.js';
 
 export interface NarrativeItem {
   story: string;
@@ -16,6 +17,7 @@ export class NarrativeBar {
   private readonly opEl: HTMLDivElement;
   private queue: NarrativeItem[] = [];
   private showing = false;
+  private lastScriptKey = '';
 
   constructor(stage: { append(...nodes: HTMLElement[]): void }) {
     this.root = document.createElement('div');
@@ -27,7 +29,7 @@ export class NarrativeBar {
     ].join(';');
     this.storyEl = document.createElement('div');
     this.storyEl.style.cssText =
-      'font-size:17px;letter-spacing:3px;color:#e8e2d3;text-shadow:0 1px 3px #000,0 0 10px rgba(0,0,0,0.8);text-align:center;white-space:nowrap;';
+      'font-size:17px;line-height:1.5;letter-spacing:3px;color:#e8e2d3;text-shadow:0 1px 3px #000,0 0 10px rgba(0,0,0,0.8);text-align:center;white-space:normal;';
     this.opEl = document.createElement('div');
     this.opEl.style.cssText =
       'font-size:13px;letter-spacing:2px;color:#ffd45e;text-shadow:0 1px 3px #000;text-align:center;';
@@ -66,13 +68,37 @@ export class NarrativeBar {
     if (!def) return;
     const first = def.steps[0];
     const op = first ? this.opOf(first.type) : undefined;
-    this.push({ story: `「${def.name}」${def.summary}`, op, dur: 5200 });
+    this.push({ story: `「${def.name}」${def.summary}`, op, dur: 6000 });
   }
 
   onQuestCompleted(id: string): void {
     const def = QUESTS[id];
-    if (!def) return;
-    this.push({ story: `${def.name} · 了结`, op: '留意右上角任务指引,前往下一目标', dur: 4600 });
+    const script = chapterByQuest(id);
+    const isChapterEnd = !!script && script.quests[script.quests.length - 1] === id;
+    this.push({
+      story: `${def?.name ?? '任务'} · 了结`,
+      op: isChapterEnd ? '卷末 · 留意右上角新目标' : '留意右上角任务指引,前往下一目标',
+      dur: 3600,
+    });
+    if (isChapterEnd && script) {
+      for (const line of script.epilogue) this.push({ story: line, dur: 4200 });
+    }
+  }
+
+  /** 章节切换:首次进本章播全套卷首旁白;同章内切图或回访旧图只播地图题记 */
+  onChapterScript(key: string, mapName: string, epigraph: string, mapId?: string): void {
+    const s = chapterByKey(key);
+    if (key === this.lastScriptKey || (s && mapId && s.mapId !== mapId)) {
+      this.push({ story: `${mapName} —— ${epigraph}`, dur: 3600 });
+      return;
+    }
+    this.lastScriptKey = key;
+    if (!s) {
+      this.push({ story: `${mapName} —— ${epigraph}`, dur: 3600 });
+      return;
+    }
+    this.push({ story: `${s.label} · ${s.title} —— ${s.epigraph}`, op: s.cast, dur: 4600 });
+    for (const line of s.prologue) this.push({ story: line, dur: 4000 });
   }
 
   onChapter(chapterName: string, epigraph: string): void {
