@@ -1,10 +1,19 @@
 import * as THREE from 'three';
 import type { CharacterPalette } from '../data/character-palettes.js';
+import {
+  buildMats, mesh, makeCollar, makeWaist, makeSkirt, makeSleeve,
+  makeInnerSleeve, makeShoe, makeShoulder,
+} from './rigParts.js';
+import type { RigMats } from './rigParts.js';
+import { makeHead } from './rigHead.js';
 
 /**
- * 角色人形 Rig v2(M8+ 画质升级):分段四肢(肘/膝弯曲)、五官头面、
- * 汉服层叠衣袍、平滑着色;程序动画(idle 呼吸/跑步行走/攻击/施法/倒地)。
+ * 角色人形 Rig v4.1(国漫仙侠公子):墨黑中分长发 + 金质翼冠嵌蓝宝石、
+ * 垂胸长鬓发、剑眉凤眼、藏青外袍 + 月白宽 V 交领、银灰云纹肩饰、
+ * 广袖垂胡、腰封青玉佩、圆头布鞋;分段四肢 + 程序动画状态机。
+ * v4.1 比例微调:肩略加宽、腿略加粗,减弱低模 Q 版头重感。
  * 主角与 NPC 共用;武器挂点保留(右手前臂末端)。
+ * 部件几何见 rigParts.ts / rigHead.ts,本文件只负责组装与动画。
  */
 
 export type RigAnimState = 'idle' | 'run' | 'attack' | 'cast' | 'dodge' | 'dead';
@@ -17,51 +26,8 @@ export interface CharacterRig {
   dispose(): void;
 }
 
-interface Mats {
-  robe: THREE.MeshStandardMaterial;
-  robeDark: THREE.MeshStandardMaterial;
-  trim: THREE.MeshStandardMaterial;
-  belt: THREE.MeshStandardMaterial;
-  pants: THREE.MeshStandardMaterial;
-  skin: THREE.MeshStandardMaterial;
-  hair: THREE.MeshStandardMaterial;
-  hat: THREE.MeshStandardMaterial;
-  shoe: THREE.MeshStandardMaterial;
-  eyeWhite: THREE.MeshStandardMaterial;
-  eyeDark: THREE.MeshStandardMaterial;
-  mouth: THREE.MeshStandardMaterial;
-  gold: THREE.MeshStandardMaterial;
-}
-
-function buildMats(p: CharacterPalette): Mats {
-  const smooth = (color: string, rough = 0.85): THREE.MeshStandardMaterial =>
-    new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: 0 });
-  return {
-    robe: smooth(p.robe, 0.88),
-    robeDark: smooth(new THREE.Color(p.robe).multiplyScalar(0.72).getStyle(), 0.9),
-    trim: smooth(p.trim, 0.8),
-    belt: smooth(p.belt, 0.7),
-    pants: smooth(p.pants, 0.9),
-    skin: smooth(p.skin, 0.62),
-    hair: smooth(p.hair, 0.55),
-    hat: smooth(p.hat, 0.85),
-    shoe: smooth(p.shoe, 0.8),
-    eyeWhite: smooth('#f2f0ea', 0.35),
-    eyeDark: smooth('#2b1c12', 0.3),
-    mouth: smooth('#8a4a42', 0.5),
-    gold: smooth('#c9a25c', 0.35),
-  };
-}
-
-function mesh(geo: THREE.BufferGeometry, m: THREE.Material, x = 0, y = 0, z = 0): THREE.Mesh {
-  const mesh = new THREE.Mesh(geo, m);
-  mesh.position.set(x, y, z);
-  mesh.castShadow = true;
-  return mesh;
-}
-
 export function createCharacterRig(palette: CharacterPalette): CharacterRig {
-  const M = buildMats(palette);
+  const M: RigMats = buildMats(palette);
   const root = new THREE.Group();
   root.name = `rig-${palette.id}`;
 
@@ -70,148 +36,42 @@ export function createCharacterRig(palette: CharacterPalette): CharacterRig {
   body.position.y = 0.98;
   root.add(body);
 
-  // 上衣:胸背(平滑锥柱,肩宽腰窄)
   const chest = mesh(new THREE.CylinderGeometry(0.185, 0.155, 0.44, 12), M.robe, 0, 0.24, 0);
   body.add(chest);
-  // 交领(汉服 V 领:两条斜襟)
-  const lapelL = mesh(new THREE.BoxGeometry(0.045, 0.34, 0.02), M.trim, -0.055, 0.3, 0.155);
-  lapelL.rotation.z = -0.42;
-  const lapelR = mesh(new THREE.BoxGeometry(0.045, 0.34, 0.02), M.trim, 0.055, 0.3, 0.155);
-  lapelR.rotation.z = 0.42;
-  body.add(lapelL, lapelR);
-  // 束腰(腰带+玉佩+绦带坠)
-  const belt = mesh(new THREE.CylinderGeometry(0.168, 0.172, 0.09, 12), M.belt, 0, 0.045, 0);
-  body.add(belt);
-  const jade = mesh(new THREE.CylinderGeometry(0.032, 0.032, 0.008, 10),
-    new THREE.MeshStandardMaterial({ color: '#3f6f5f', roughness: 0.25 }), 0, -0.03, 0.16);
-  jade.rotation.x = Math.PI / 2;
-  const jadeKnot = mesh(new THREE.SphereGeometry(0.014, 6, 5), M.gold, 0, 0.0, 0.165);
-  body.add(jade, jadeKnot);
-  // 腰间长飘带(前垂两根,随跑动/风摆动 —— 国漫气质)
-  const sashGroup = new THREE.Group();
-  sashGroup.position.set(0, 0.03, 0);
-  body.add(sashGroup);
-  const sashes: THREE.Group[] = [];
-  for (const [sx, sz] of [[-0.16, 0.24], [0.16, 0.24], [0.03, -0.26]] as const) {
-    const g = new THREE.Group();
-    g.position.set(sx, 0, sz);
-    const ribbon = mesh(new THREE.BoxGeometry(0.045, 0.46, 0.012), M.trim, 0, -0.23, 0);
-    g.add(ribbon);
-    const tip = mesh(new THREE.BoxGeometry(0.049, 0.09, 0.013), M.belt, 0, -0.48, 0);
-    g.add(tip);
-    sashGroup.add(g);
-    sashes.push(g);
-  }
-  // 下裙(袍摆,随跑动摆动)
-  const skirt = mesh(new THREE.CylinderGeometry(0.16, 0.27, 0.52, 12), M.robeDark, 0, -0.24, 0);
-  body.add(skirt);
-  const hem = mesh(new THREE.CylinderGeometry(0.272, 0.28, 0.06, 12), M.trim, 0, -0.48, 0);
-  body.add(hem);
-  // 肩头披领(小垫肩)
   for (const s of [-1, 1] as const) {
-    const shoulder = mesh(new THREE.SphereGeometry(0.085, 10, 8), M.robe, s * 0.21, 0.4, 0);
+    const shoulder = mesh(new THREE.SphereGeometry(0.085, 10, 8), M.robe, s * 0.225, 0.4, 0);
     shoulder.scale.set(1.15, 0.7, 1);
     body.add(shoulder);
+    const pauldron = makeShoulder(M, s);
+    pauldron.position.set(s * 0.225, 0.4, 0);
+    body.add(pauldron);
   }
+  body.add(makeCollar(M));
+
+  const waist = makeWaist(M);
+  body.add(waist.group);
+  const skirt = makeSkirt(M);
+  body.add(skirt);
 
   /* ============ 头颈 ============ */
-  const neck = mesh(new THREE.CylinderGeometry(0.055, 0.06, 0.1, 8), M.skin, 0, 0.49, 0);
+  const neck = mesh(new THREE.CylinderGeometry(0.052, 0.058, 0.055, 8), M.skin, 0, 0.515, 0);
   body.add(neck);
-  const head = new THREE.Group();
-  head.position.y = 0.62;
+  const { head, backHair, sideLocks } = makeHead(M);
   body.add(head);
-  // 颅与下颌
-  const skull = mesh(new THREE.SphereGeometry(0.15, 18, 16), M.skin);
-  skull.scale.set(0.94, 1.06, 0.98);
-  skull.position.y = 0.05;
-  const jaw = mesh(new THREE.SphereGeometry(0.105, 14, 12), M.skin, 0, -0.035, 0.028);
-  jaw.scale.set(0.88, 0.78, 0.95);
-  head.add(skull, jaw);
-  // 发冠层(后脑+顶:偏后,露出面部)
-  const hairBack = mesh(new THREE.SphereGeometry(0.156, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.56), M.hair, 0, 0.062, -0.028);
-  hairBack.scale.set(0.98, 1.02, 1.0);
-  head.add(hairBack);
-  // 刘海(三缕,薄贴额际)
-  for (const [bx, bz, br] of [[-0.058, 0.12, 0.028], [0, 0.132, 0.033], [0.058, 0.12, 0.028]] as const) {
-    const bang = mesh(new THREE.SphereGeometry(br, 8, 6), M.hair, bx, 0.128, bz);
-    bang.scale.set(1.05, 0.55, 0.42);
-    head.add(bang);
-  }
-  // 国漫风:高马尾(发束扎起,垂落飘动)+ 鬓边垂发
-  const hairTie = mesh(new THREE.TorusGeometry(0.038, 0.014, 8, 12), M.gold, 0, 0.21, -0.075);
-  hairTie.rotation.x = Math.PI / 2 - 0.3;
-  const ponytail = new THREE.Group();
-  ponytail.position.set(0, 0.19, -0.09);
-  const tailSegs: THREE.Mesh[] = [];
-  const tailLens = [0.13, 0.115, 0.1, 0.085];
-  let py = 0;
-  for (let i = 0; i < tailLens.length; i++) {
-    const r = 0.062 - i * 0.011;
-    const seg = mesh(new THREE.SphereGeometry(r, 10, 8), M.hair, 0, py - tailLens[i]! / 2, -0.02 - i * 0.012);
-    seg.scale.set(1 - i * 0.1, tailLens[i]! / r, 1 - i * 0.1);
-    ponytail.add(seg);
-    tailSegs.push(seg);
-    py -= tailLens[i]!;
-  }
-  const tailTip = mesh(new THREE.ConeGeometry(0.03, 0.11, 8), M.hair, 0, py - 0.06, -0.055);
-  tailTip.rotation.x = Math.PI;
-  ponytail.add(tailTip);
-  head.add(hairTie, ponytail);
-  // 鬓边垂发(两缕贴颊)
-  for (const s of [-1, 1] as const) {
-    const lock = mesh(new THREE.CylinderGeometry(0.02, 0.012, 0.3, 7), M.hair, s * 0.135, -0.02, 0.06);
-    lock.rotation.z = s * 0.05;
-    head.add(lock);
-  }
-  // 眉(两道,纤细)
-  for (const s of [-1, 1] as const) {
-    const brow = mesh(new THREE.BoxGeometry(0.04, 0.007, 0.01), M.hair, s * 0.052, 0.08, 0.134);
-    brow.rotation.z = s * 0.16;
-    head.add(brow);
-  }
-  // 眼(国漫大眼:白+瞳+上睫毛线)
-  for (const s of [-1, 1] as const) {
-    const white = mesh(new THREE.SphereGeometry(0.036, 10, 8), M.eyeWhite, s * 0.052, 0.044, 0.124);
-    white.scale.set(1.12, 0.92, 0.6);
-    const iris = mesh(new THREE.SphereGeometry(0.02, 8, 7), M.eyeDark, s * 0.052, 0.041, 0.147);
-    iris.scale.set(1, 1.08, 0.5);
-    const lash = mesh(new THREE.BoxGeometry(0.062, 0.009, 0.01), M.hair, s * 0.052, 0.062, 0.13);
-    lash.rotation.z = s * 0.1;
-    head.add(white, iris, lash);
-  }
-  // 鼻与口
-  const nose = mesh(new THREE.ConeGeometry(0.016, 0.042, 6), M.skin, 0, 0.008, 0.152);
-  nose.rotation.x = Math.PI / 2 + 0.25;
-  const mouth = mesh(new THREE.BoxGeometry(0.042, 0.008, 0.008), M.mouth, 0, -0.052, 0.132);
-  head.add(nose, mouth);
-  // 双耳
-  for (const s of [-1, 1] as const) {
-    const ear = mesh(new THREE.SphereGeometry(0.028, 8, 7), M.skin, s * 0.145, 0.04, 0.01);
-    ear.scale.set(0.5, 1, 0.8);
-    head.add(ear);
-  }
 
   /* ============ 手臂(肩→肘→腕) ============ */
   function makeArm(side: -1 | 1): { shoulder: THREE.Group; elbow: THREE.Group } {
     const shoulder = new THREE.Group();
-    shoulder.position.set(side * 0.245, 0.4, 0);
+    shoulder.position.set(side * 0.255, 0.4, 0);
     body.add(shoulder);
-    // 宽袖(垂坠,独立双面材质避免污染共享 robe)
-    const sleeveMat = M.robe.clone();
-    sleeveMat.side = THREE.DoubleSide;
-    const sleeve = mesh(new THREE.CylinderGeometry(0.075, 0.105, 0.2, 10, 1, true), sleeveMat, 0, -0.1, 0);
-    shoulder.add(sleeve);
+    shoulder.add(makeSleeve(M));
     const upper = mesh(new THREE.CylinderGeometry(0.052, 0.045, 0.26, 10), M.skin, 0, -0.17, 0);
     shoulder.add(upper);
     const elbow = new THREE.Group();
     elbow.position.y = -0.3;
     shoulder.add(elbow);
-    const cuffMat = M.trim.clone();
-    cuffMat.side = THREE.DoubleSide;
-    const cuff = mesh(new THREE.CylinderGeometry(0.058, 0.066, 0.08, 10, 1, true), cuffMat, 0, -0.03, 0);
-    elbow.add(cuff);
-    const fore = mesh(new THREE.CylinderGeometry(0.043, 0.038, 0.24, 10), M.skin, 0, -0.14, 0);
-    elbow.add(fore);
+    // 中衣窄袖包住前臂(汉服内外层次),只留手在广袖外
+    elbow.add(makeInnerSleeve(M));
     const hand = mesh(new THREE.SphereGeometry(0.048, 10, 8), M.skin, 0, -0.285, 0);
     hand.scale.set(0.85, 1.1, 0.6);
     elbow.add(hand);
@@ -230,17 +90,14 @@ export function createCharacterRig(palette: CharacterPalette): CharacterRig {
     const hip = new THREE.Group();
     hip.position.set(side * 0.095, -0.06, 0);
     body.add(hip);
-    const thigh = mesh(new THREE.CylinderGeometry(0.078, 0.062, 0.4, 10), M.pants, 0, -0.2, 0);
+    const thigh = mesh(new THREE.CylinderGeometry(0.086, 0.07, 0.4, 10), M.pants, 0, -0.2, 0);
     hip.add(thigh);
     const knee = new THREE.Group();
     knee.position.y = -0.4;
     hip.add(knee);
-    const calf = mesh(new THREE.CylinderGeometry(0.055, 0.045, 0.38, 10), M.pants, 0, -0.19, 0);
+    const calf = mesh(new THREE.CylinderGeometry(0.062, 0.05, 0.38, 10), M.pants, 0, -0.19, 0);
     knee.add(calf);
-    const ankle = mesh(new THREE.CylinderGeometry(0.05, 0.052, 0.07, 8), M.shoe, 0, -0.38, 0);
-    knee.add(ankle);
-    const foot = mesh(new THREE.BoxGeometry(0.095, 0.06, 0.21), M.shoe, 0, -0.435, 0.05);
-    knee.add(foot);
+    knee.add(makeShoe(M));
     return { hip, knee };
   }
   const legL = makeLeg(-1);
@@ -334,13 +191,16 @@ export function createCharacterRig(palette: CharacterPalette): CharacterRig {
     skirt.rotation.x = runBlend * 0.06;
     head.rotation.x = -bob * 1.5 + (state === 'idle' ? Math.sin(elapsed * 0.75) * 0.022 : 0);
     head.rotation.y = state === 'idle' ? Math.sin(elapsed * 0.45) * 0.14 : 0;
-    // 马尾与飘带:重力下垂 + 跑动后扬 + 风摆
-    const tailSway = Math.sin(elapsed * 2.4) * 0.09;
-    ponytail.rotation.x = 0.12 + runBlend * 0.45 + tailSway * 0.5;
-    ponytail.rotation.z = Math.sin(elapsed * 1.7) * 0.08;
-    sashes.forEach((g, i) => {
-      g.rotation.x = -runBlend * 0.5 + Math.sin(elapsed * 2.1 + i * 1.3) * 0.12;
-      g.rotation.z = Math.sin(elapsed * 1.6 + i * 2.1) * 0.1;
+    // 后披发、垂胸长鬓发与宫绦:重力下垂 + 跑动后扬 + 风摆
+    backHair.rotation.x = 0.06 + runBlend * 0.32 + Math.sin(elapsed * 2.4) * 0.05;
+    backHair.rotation.z = Math.sin(elapsed * 1.7) * 0.06;
+    sideLocks.forEach((g, i) => {
+      g.rotation.x = runBlend * 0.26 + Math.sin(elapsed * 1.9 + i * 1.7) * 0.05;
+      g.rotation.z = Math.sin(elapsed * 1.5 + i * 2.2) * 0.045;
+    });
+    waist.tassels.forEach((g, i) => {
+      g.rotation.x = -runBlend * 0.42 + Math.sin(elapsed * 2.1 + i * 1.5) * 0.1;
+      g.rotation.z = Math.sin(elapsed * 1.6 + i * 2.1) * 0.09;
     });
   };
 
@@ -349,8 +209,9 @@ export function createCharacterRig(palette: CharacterPalette): CharacterRig {
     rightHand,
     setPalette(p: CharacterPalette) {
       const next = buildMats(p);
-      for (const key of Object.keys(M) as (keyof Mats)[]) {
+      for (const key of Object.keys(M) as (keyof RigMats)[]) {
         M[key]!.color.copy(next[key]!.color);
+        M[key]!.emissive.copy(next[key]!.emissive);
         next[key]!.dispose();
       }
     },
