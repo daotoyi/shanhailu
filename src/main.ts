@@ -46,7 +46,9 @@ import { PlayerHUD } from './ui/PlayerHUD.js';
 import { GamePanels } from './ui/GamePanels.js';
 import { CanvasLoading } from './ui/canvas/CanvasLoading.js';
 import { NarrativeBar } from './ui/NarrativeBar.js';
-import { StoryNav } from './ui/StoryNav.js';
+import { StoryNav, CHAPTER_LIST } from './ui/StoryNav.js';
+import { ChapterSelect } from './ui/ChapterSelect.js';
+import { CHAPTER_SCRIPTS, type ChapterKey } from './data/story/chapters.js';
 import { DebugCamera } from './world/DebugCamera.js';
 
 const FONT_SOURCE_LABEL: Record<FontSource, string> = {
@@ -328,6 +330,22 @@ async function boot(): Promise<void> {
     if (transition.isBusy) return;
     teleportTo(entry.mapId, entry.spawnId);
   });
+
+  /** 自由选章(C 档):切到该章场景并接引子任务,引子对话/NPC/旁白经既有管线呈现 */
+  const enterFreeChapter = (key: string): void => {
+    const s = CHAPTER_SCRIPTS[key as ChapterKey];
+    if (!s) return;
+    const spawn = CHAPTER_LIST.find((c) => c.key === key)?.spawnId ?? 'entry';
+    // 排队:过渡未结束时入队(覆盖式),避免连续选章被吞
+    transition.queue(() => {
+      state.setChapter(key);
+      const first = s.quests[0];
+      if (first) quests.forceAccept(first); // 无视前置,直接激活引子任务
+      teleportTo(s.mapId, spawn);
+    });
+  };
+  new ChapterSelect(ui, enterFreeChapter);
+  (globalThis as Record<string, unknown>)['__enterChapter'] = enterFreeChapter;
   const f3 = new F3Panel(
     bus,
     {

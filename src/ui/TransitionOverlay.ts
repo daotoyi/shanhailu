@@ -7,6 +7,8 @@ export class TransitionOverlay {
   private readonly title: HTMLDivElement;
   private readonly sub: HTMLDivElement;
   private busy = false;
+  /** 过渡期间的排队请求(覆盖式:只保留最后一次) */
+  private queued: (() => void) | null = null;
 
   constructor(stage: { append(node: HTMLElement): void }) {
     this.root = document.createElement('div');
@@ -29,6 +31,15 @@ export class TransitionOverlay {
 
   get isBusy(): boolean {
     return this.busy;
+  }
+
+  /** 过渡中调用则排队(覆盖式,只执行最后一次),空闲时立即执行 */
+  queue(cb: () => void): void {
+    if (this.busy) {
+      this.queued = cb;
+    } else {
+      cb();
+    }
   }
 
   /** 遮入 → 回调(切图等重活) → 遮出 */
@@ -56,6 +67,11 @@ export class TransitionOverlay {
           this.root.style.display = 'none';
           this.busy = false;
           done?.();
+          if (this.queued) {
+            const q = this.queued;
+            this.queued = null;
+            q();
+          }
         }, 480);
       }, 900);
     }, 520);

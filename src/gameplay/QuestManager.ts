@@ -72,6 +72,19 @@ export class QuestManager {
     return true;
   }
 
+  /** 无视前置,强制接取(自由选章 / 剧情回顾用) */
+  forceAccept(id: string): boolean {
+    if (this.active.has(id) || this.completed.has(id)) return false;
+    const def = QUESTS[id];
+    if (!def) return false;
+    const a: ActiveQuest = { id, stepIndex: 0, counts: {} };
+    this.active.set(id, a);
+    if (def.type === 'main') this.mainOrder.push(id);
+    this.bus.emit('quest:accepted', { id, name: def.name });
+    this.bus.emit('quest:changed', { id });
+    return true;
+  }
+
   /** 事件推进:所有 active 任务中匹配 type+target 的步骤 +1 */
   progress(type: string, target: string, amount = 1): void {
     for (const a of [...this.active.values()]) {

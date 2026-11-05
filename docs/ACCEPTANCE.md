@@ -153,6 +153,25 @@
 3. headless SwiftShader 下 fps 不具参考价值,未据此更新性能数字;默认画质 draw calls 仍高于红线(见已知问题 8)。
 4. 本轮已于 2026-11-05 完成「部署 → 推送」:线上站点与 GitHub `origin/main` 均同步至 `0f71f82`。部署产物 `index-BY0SzZ9e.js`(JS 755.28KB / gzip 217.88KB)+ `index-B14D4WZw.css` + 字体子集 + `manifest.json` + `index.html` 共 5 文件,服务器与本地 SHA256 逐字节一致;旧版 `index-Cy-CNcYq.js` 已清理(404),站点根宝塔管理文件保留,`nginx -t` 通过并 reload。线上校验:首页 / JS / CSS / woff2 / manifest 全 200 且 MIME 正确;浏览器(Chrome headless + CDP)访问线上域名跑完整九章闭环——**18 任务全清、active 归零**,8 处对话映射与 4 张新增引路人地图 NPC 装配全部命中,运镜字幕「昆仑雪线之上,瑶池的蟠桃三千年一熟。」实际渲染,字体子集就绪,**console 零 error / 零 4xx**。推送 `f5a706f..0f71f82`,`git ls-remote` 复核远端 HEAD 与本地一致。
 
+## 2026-11-05 自由选章 / 剧情回顾(C 档)
+
+用户选 C 档:加「自由选章 / 剧情回顾」入口,可直接跳任意章看完整剧情(验收刚补的九章)。
+
+**改动(均落 `src/`,未动已验收系统架构)**
+- 新增 `src/ui/ChapterSelect.ts`:左下常驻「章节回顾」按钮 + 九宫格浮层(章号 / 标题 / 地图 / 梗概 / 登场人物),点卡片即跳章;与右侧 `StoryNav`(线性解锁回访)互补,本面板不做解锁限制。
+- `main.ts` 新增 `enterFreeChapter(key)`:`setChapter → forceAccept 引子任务 → teleport`,场景 / NPC / 引子对话 / 卷首旁白经既有管线自动呈现。
+- `TransitionOverlay` 增加排队(覆盖式):过渡未结束时入队,只执行最后一次,避免连续选章被吞。
+- `QuestManager` 增加 `forceAccept`:无视前置 `prereq` 强制接取(引子任务 `q_chX_0` 有前置链,普通 `accept` 会被拒),使自由选章时引子对话与依赖该任务的 NPC(如共工 `when:['q_ch8_0']`)正确呈现。
+
+**自测(本地 + 线上双跑,Chrome headless + CDP)**
+- 面板:按钮存在、点击展开 overlay(flex)、9 张卡片齐。
+- 序 / 叁 / 终三章独立 reload 验证:章节、`mapId`(yaowang-valley / tanggu / buzhou)、专属 NPC(药翁 / 羿 / 共工)全部正确装配;引子对话映射命中(`dlg_ch3_intro` / `dlg_ch8_intro`);卷首旁白实际播报;**console 零 error / 零 4xx**。
+- 线上回归(真域名):同指标全绿,JS 哈希 `bd2092ea…` 与本地逐字节一致。
+
+**部署**:`pre-deploy-20261105-210938.tar.gz` 备份 → rsync 全量覆盖(无旧资源可清理)→ `nginx -t` + reload;线上 index.html / JS SHA256 与本地一致,旧包 `index-BzJsSRoP.js` 已 404。
+
+注:原 A 档(圆章锁定态无文字反馈)、B 档(章末自动传送 / 补地点提示)未做;自由选章面板已满足「跳任意章看剧情」需求。
+
 ## 复跑方式
 
 ```bash
